@@ -1,0 +1,14 @@
+import test from 'node:test'; import assert from 'node:assert/strict';
+import * as S from '../src/lib/stats.js'; import { offlineAgent, runTool, offlineAnswer } from '../src/lib/agent.js';
+test('dataset size', () => { assert.equal(S.TX.length, 5000); assert.equal(S.MERCH.length, 40); });
+test('kpis consistent', () => { const k = S.kpis(); assert.equal(k.n, 5000); assert.ok(k.success > 85 && k.success < 95); assert.equal(k.declines, S.TX.filter(t => !t.ok).length); });
+test('pattern 1 surfaces as top leak', () => { const f = S.findings()[0]; assert.match(f.title, /Acquirer C/); assert.ok(f.gap < -4); });
+test('pattern 3 issuer 07', () => assert.match(S.findings()[1].title, /Issuer 07/));
+test('pattern 2 and 4 present', () => { const f = S.findings(); assert.ok(f[2].etShare < f[2].restShare / 2); assert.ok(f[3].ts.high.share < f[3].ts.low.share / 2); });
+test('matrix has 4x7', () => { const m = S.matrix(); assert.equal(m.length, 4); assert.equal(m[0].length, 7); });
+test('emi formula', () => { assert.ok(Math.abs(S.emi(12000, 0, 12) - 1000) < 1e-9); assert.ok(S.emi(12000, 12, 12) > 1000 && S.emi(12000, 12, 12) < 1100); });
+test('every offline finding returns steps and an action', () => { for (const id of ['f1', 'f2', 'f3', 'f4']) { const r = offlineAgent(id); assert.ok(r.steps.length >= 2); assert.ok(r.finding.cause && r.finding.action && r.finding.confidence); } });
+test('unknown tool safe', () => assert.ok(runTool('nope').error));
+test('followup routes', () => assert.equal(offlineAnswer('which issuer is worst?').tool, 'issuer_split'));
+test('recommend returns for all merchants', () => { for (let i = 0; i < 40; i++) assert.ok(S.recommend(i).profile); });
+test('agent endpoint offline path', async () => { delete process.env.GEMINI_API_KEY; const h = (await import('../api/agent.js')).default; let out; await h({ body: { id: 'f1' } }, { setHeader() {}, status() { return { json: v => (out = v) }; } }); assert.equal(out.mode, 'offline'); assert.ok(out.finding.action); });
