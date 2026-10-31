@@ -2,14 +2,22 @@
 import { TOOL_DEFS, runTool, offlineAgent, offlineAnswer } from '../src/lib/agent.js';
 import * as S from '../src/lib/stats.js';
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-const URL_ = key => `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
+const MODELS = [process.env.GEMINI_MODEL, 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'].filter(Boolean);
+let good = null; // remember the model that worked on this warm instance
+const URL_ = (key, model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
 const SYSTEM = 'You are an acceptance analyst for a payments network. You may only state numbers returned by your tools. Call tools to gather evidence, then answer in JSON with keys cause, confidence (Low|Medium|High), action. Keep each to one or two plain sentences. Never claim proven uplift or invent figures. If the sample is small, say so and lower confidence.';
 
 async function gemini(key, contents) {
-  const res = await fetch(URL_(key), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM }] }, contents, tools: [{ functionDeclarations: TOOL_DEFS }] }) });
-  if (!res.ok) { let m = ''; try { m = (await res.json()).error?.message || ''; } catch {} throw new Error('Gemini returned ' + res.status + ' ' + m.slice(0, 160)); }
-  return res.json();
+  const body = JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM }] }, contents, tools: [{ functionDeclarations: TOOL_DEFS }] });
+  let last = '';
+  for (const model of good ? [good] : MODELS) {
+    const res = await fetch(URL_(key, model), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    if (res.ok) { good = model; return res.json(); }
+    let m = ''; try { m = (await res.json()).error?.message || ''; } catch {}
+    last = 'Gemini returned ' + res.status + ' for ' + model + ' ' + m.slice(0, 140);
+    if (res.status !== 404 && res.status !== 400) break;
+  }
+  good = null; throw new Error(last);
 }
 
 async function liveAgent(key, prompt) {
