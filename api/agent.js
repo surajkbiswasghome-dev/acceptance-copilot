@@ -7,23 +7,37 @@ let good = null; // remember the model that worked on this warm instance
 const URL_ = (key, model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
 const SYSTEM = 'You are an acceptance analyst for a payments network. You may only state numbers returned by your tools. Call tools to gather evidence, then answer in JSON with keys cause, confidence (Low|Medium|High), action. Keep each to one or two plain sentences. Never claim proven uplift or invent figures. If the sample is small, say so and lower confidence.';
 
+async function discover(key) {
+  try {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + key, { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent') && /flash/.test(m.name) && !/(image|tts|live|audio|thinking-exp|embedding|robotics|computer)/.test(m.name))
+      .map(m => m.name.replace('models/', '')).sort((x, y) => (/lite/.test(x) ? 1 : 0) - (/lite/.test(y) ? 1 : 0) || y.localeCompare(x, undefined, { numeric: true }));
+  } catch { return []; }
+}
+async function tryModel(key, model, body, tries, log) {
+  for (let i = 0; i < tries; i++) {
+    let res;
+    try { res = await fetch(URL_(key, model), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(14000) }); }
+    catch { log.push(model + ': no answer'); return null; }
+    if (res.ok) return res.json();
+    let m = ''; try { m = (await res.json()).error?.message || ''; } catch {}
+    log.push(model + ': ' + res.status);
+    if (res.status === 401 || res.status === 403) throw new Error('Gemini returned ' + res.status + ' ' + m.slice(0, 140));
+    if (res.status === 503 || res.status === 429) { await new Promise(r => setTimeout(r, 1500)); continue; }
+    return null;
+  }
+  return null;
+}
 async function gemini(key, contents) {
   const body = JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM }] }, contents, tools: [{ functionDeclarations: TOOL_DEFS }] });
-  let last = '';
-  for (const model of good ? [good, ...MODELS.filter(m => m !== good)] : MODELS) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      let res;
-      try { res = await fetch(URL_(key, model), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(14000) }); }
-      catch (e) { last = 'No answer from ' + model; break; }
-      if (res.ok) { good = model; return res.json(); }
-      let m = ''; try { m = (await res.json()).error?.message || ''; } catch {}
-      last = 'Gemini returned ' + res.status + ' for ' + model + ' ' + m.slice(0, 140);
-      if (res.status === 401 || res.status === 403) throw new Error(last);
-      if (res.status === 503 || res.status === 429) { await new Promise(r => setTimeout(r, 1200)); continue; }
-      break;
-    }
-  }
-  good = null; throw new Error(last);
+  const log = []; const seen = new Set();
+  const order = good ? [good] : MODELS.slice(0, 2);
+  for (const m of order) { seen.add(m); const out = await tryModel(key, m, body, 3, log); if (out) { good = m; return out; } }
+  const found = await discover(key);
+  for (const m of found.filter(x => !seen.has(x)).slice(0, 4)) { seen.add(m); const out = await tryModel(key, m, body, 2, log); if (out) { good = m; return out; } }
+  good = null; throw new Error('No Gemini model answered. Tried: ' + log.join(', ') + (found.length ? '. Available: ' + found.slice(0, 5).join(', ') : ''));
 }
 
 async function liveAgent(key, prompt) {
