@@ -7,10 +7,11 @@ import { Head, AiTag, Tick, Gate, Mic } from '../ui.jsx';
 async function callAgent(payload) {
   try {
     const r = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!r.ok) throw new Error('http');
-    const j = await r.json(); if (!j || j.error) throw new Error('bad'); return j;
-  } catch {
-    return payload.question ? { ...offlineAnswer(payload.question), mode: 'offline' } : offlineAgent(payload.id);
+    if (!r.ok) throw new Error('server answered HTTP ' + r.status);
+    const j = await r.json(); if (!j || j.error) throw new Error('server returned an unreadable answer'); return j;
+  } catch (e) {
+    const reason = 'Could not reach the agent endpoint: ' + (e.message || e);
+    return payload.question ? { ...offlineAnswer(payload.question), mode: 'offline', reason } : { ...offlineAgent(payload.id), reason };
   }
 }
 const fromHash = () => (location.hash.split('?id=')[1] || 'f1').split('&')[0];

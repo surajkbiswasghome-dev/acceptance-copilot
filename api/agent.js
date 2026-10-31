@@ -11,7 +11,7 @@ async function gemini(key, contents) {
   const body = JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM }] }, contents, tools: [{ functionDeclarations: TOOL_DEFS }] });
   let last = '';
   for (const model of good ? [good] : MODELS) {
-    const res = await fetch(URL_(key, model), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    const res = await fetch(URL_(key, model), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(14000) });
     if (res.ok) { good = model; return res.json(); }
     let m = ''; try { m = (await res.json()).error?.message || ''; } catch {}
     last = 'Gemini returned ' + res.status + ' for ' + model + ' ' + m.slice(0, 140);
@@ -22,7 +22,9 @@ async function gemini(key, contents) {
 
 async function liveAgent(key, prompt) {
   const contents = [{ role: 'user', parts: [{ text: prompt }] }]; const steps = [];
-  for (let i = 0; i < 5; i++) {
+  const t0 = Date.now();
+  for (let i = 0; i < 4; i++) {
+    if (Date.now() - t0 > 40000) throw new Error('Gemini was too slow');
     const out = await gemini(key, contents);
     const parts = out.candidates?.[0]?.content?.parts || [];
     const calls = parts.filter(p => p.functionCall);
