@@ -10,12 +10,18 @@ const SYSTEM = 'You are an acceptance analyst for a payments network. You may on
 async function gemini(key, contents) {
   const body = JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM }] }, contents, tools: [{ functionDeclarations: TOOL_DEFS }] });
   let last = '';
-  for (const model of good ? [good] : MODELS) {
-    const res = await fetch(URL_(key, model), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(14000) });
-    if (res.ok) { good = model; return res.json(); }
-    let m = ''; try { m = (await res.json()).error?.message || ''; } catch {}
-    last = 'Gemini returned ' + res.status + ' for ' + model + ' ' + m.slice(0, 140);
-    if (res.status !== 404 && res.status !== 400) break;
+  for (const model of good ? [good, ...MODELS.filter(m => m !== good)] : MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let res;
+      try { res = await fetch(URL_(key, model), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(14000) }); }
+      catch (e) { last = 'No answer from ' + model; break; }
+      if (res.ok) { good = model; return res.json(); }
+      let m = ''; try { m = (await res.json()).error?.message || ''; } catch {}
+      last = 'Gemini returned ' + res.status + ' for ' + model + ' ' + m.slice(0, 140);
+      if (res.status === 401 || res.status === 403) throw new Error(last);
+      if (res.status === 503 || res.status === 429) { await new Promise(r => setTimeout(r, 1200)); continue; }
+      break;
+    }
   }
   good = null; throw new Error(last);
 }
