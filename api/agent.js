@@ -8,25 +8,36 @@ const URL_ = (key, model) => `https://generativelanguage.googleapis.com/v1beta/m
 const SYSTEM = 'You are an acceptance analyst for a payments network. Use ONLY the numbers in the evidence given. Never invent figures or claim proven uplift. If a sample is small, say so and lower confidence. Be plain and brief.';
 let good = null;
 
+async function discover(key) {
+  try {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + key, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent') && /flash/.test(m.name) && !/(image|tts|live|audio|embedding|robotics|computer|exp)/.test(m.name))
+      .map(m => m.name.replace('models/', '')).sort((x, y) => (/lite/.test(y) ? 1 : 0) - (/lite/.test(x) ? 1 : 0) || y.localeCompare(x, undefined, { numeric: true }));
+  } catch { return []; }
+}
 async function ask(key, prompt, schema) {
-  const started = Date.now(); const log = [];
+  const started = Date.now(); const log = []; const BUDGET = 45000;
   const body = JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM }] }, contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: schema ? { responseMimeType: 'application/json' } : {} });
-  const order = good ? [good, ...MODELS.filter(m => m !== good)] : MODELS;
-  for (const model of order) {
+  const tried = new Set(); let queue = good ? [good] : [...MODELS]; let discovered = false;
+  while (queue.length || !discovered) {
+    if (!queue.length) { discovered = true; queue = (await discover(key)).filter(m => !tried.has(m)).slice(0, 4); if (!queue.length) break; }
+    const model = queue.shift(); tried.add(model);
     for (let i = 0; i < 2; i++) {
-      const left = 22000 - (Date.now() - started); if (left < 3000) throw new Error('Ran out of time. Tried: ' + log.join(', '));
+      const left = BUDGET - (Date.now() - started); if (left < 4000) throw new Error('Ran out of time. Tried: ' + log.join(', '));
       let res;
-      try { res = await fetch(URL_(key, model), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(Math.min(9000, left)) }); }
+      try { res = await fetch(URL_(key, model), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(Math.min(tried.size === 1 ? 22000 : 12000, left)) }); }
       catch { log.push(model + ': no answer'); break; }
       if (res.ok) { const j = await res.json(); const text = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''); if (text) { good = model; return text; } log.push(model + ': empty'); break; }
       let m = ''; try { m = (await res.json()).error?.message || ''; } catch {}
       log.push(model + ': ' + res.status);
       if (res.status === 401 || res.status === 403) throw new Error('Gemini returned ' + res.status + ' ' + m.slice(0, 140));
-      if (res.status === 503 || res.status === 429) { await new Promise(r => setTimeout(r, 1000)); continue; }
+      if (res.status === 503 || res.status === 429) { await new Promise(r => setTimeout(r, 800)); continue; }
       break;
     }
   }
-  throw new Error('No Gemini model answered. Tried: ' + log.join(', '));
+  good = null; throw new Error('No Gemini model answered. Tried: ' + log.join(', '));
 }
 
 export default async function handler(req, res) {
