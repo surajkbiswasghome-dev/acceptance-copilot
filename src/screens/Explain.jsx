@@ -35,6 +35,7 @@ export default function Explain({ role }) {
   return (
     <>
       <Head title="Explain" sub="The agent picks tools, reads computed evidence, and proposes a cause and an action. A person decides." right={run && <span className="pill" title={run.mode === 'live' ? 'Explained by Gemini using the tools below' : 'Gemini is not connected, so a rules-based explanation is shown'}>{run.mode === 'live' ? 'Live model' : 'Offline rules mode'}</span>} />
+      {run && run.mode !== 'live' && run.reason && <div className="banner">Why offline: {run.reason}</div>}
       <div className="grid2" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,2fr)', alignItems: 'start' }}>
         <div className="col queue" aria-label="Findings queue">{items.map(f => <button key={f.id} className={f.id === item.id ? 'on' : ''} onClick={() => { location.hash = '#/explain?id=' + f.id; setId(f.id); }}><span className="row between"><Gate g={f.gate} />{dec[f.id] && <span className={'pill ' + (dec[f.id] === 'approved' ? 'ok' : 'bad')}>{dec[f.id]}</span>}</span><b>{f.title}</b><span className="mute sm">{f.impact}</span></button>)}</div>
         <div className="col gap16">

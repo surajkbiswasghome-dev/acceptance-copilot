@@ -8,7 +8,7 @@ const SYSTEM = 'You are an acceptance analyst for a payments network. You may on
 
 async function gemini(key, contents) {
   const res = await fetch(URL_(key), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM }] }, contents, tools: [{ functionDeclarations: TOOL_DEFS }] }) });
-  if (!res.ok) throw new Error('gemini ' + res.status);
+  if (!res.ok) { let m = ''; try { m = (await res.json()).error?.message || ''; } catch {} throw new Error('Gemini returned ' + res.status + ' ' + m.slice(0, 160)); }
   return res.json();
 }
 
@@ -32,17 +32,17 @@ export default async function handler(req, res) {
   const key = process.env.GEMINI_API_KEY;
   try {
     if (body.question) {
-      if (!key) return res.status(200).json({ mode: 'offline', ...offlineAnswer(body.question) });
+      if (!key) return res.status(200).json({ mode: 'offline', ...offlineAnswer(body.question), reason: 'GEMINI_API_KEY is not set on the server' });
       const { steps, text } = await liveAgent(key, body.question + ' Answer in two sentences using tool results only.');
       return res.status(200).json({ mode: 'live', steps, answer: text });
     }
     const f = S.findings().find(x => x.id === body.id);
     if (!f) return res.status(400).json({ error: 'unknown finding' });
-    if (!key) return res.status(200).json(offlineAgent(body.id));
+    if (!key) return res.status(200).json({ ...offlineAgent(body.id), reason: 'GEMINI_API_KEY is not set on the server (add it in Vercel and redeploy)' });
     const { steps, text } = await liveAgent(key, `Investigate this finding and explain it: "${f.title}: ${f.subtitle}". Instrument indexes: ${S.INST.map((n, i) => i + '=' + n).join(', ')}. Acquirer indexes: ${S.ACQ.map((n, i) => i + '=' + n).join(', ')}.`);
     let finding; try { finding = JSON.parse(text.replace(/```json|```/g, '').trim()); } catch { throw new Error('unparseable'); }
     return res.status(200).json({ mode: 'live', steps, finding: { ...finding, gate: f.gate } });
   } catch (e) {
-    return res.status(200).json({ ...(body.question ? offlineAnswer(body.question) : offlineAgent(body.id)), mode: 'offline', note: 'Live model unavailable, showing rules-based explanation.' });
+    return res.status(200).json({ ...(body.question ? offlineAnswer(body.question) : offlineAgent(body.id)), mode: 'offline', reason: String(e.message || e).replace(/key=[^&\s]+/g, 'key=***'), note: 'Live model unavailable, showing rules-based explanation.' });
   }
 }
