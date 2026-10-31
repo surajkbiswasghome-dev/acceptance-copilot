@@ -1,1 +1,1 @@
-{ "functions": { "api/agent.js": { "maxDuration": 60 } } }
+{ "functions": { "api/agent.js": { "maxDuration": 30 } } }
