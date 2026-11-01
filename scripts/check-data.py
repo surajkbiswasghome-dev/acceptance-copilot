@@ -9,7 +9,7 @@ def check(name, cond, detail):
     print(('PASS ' if cond else 'FAIL ') + name + ' :: ' + detail)
     if not cond: fails.append(name)
 print('transactions', len(T), 'merchants', len(M))
-check('size', 4500 <= len(T) <= 5500 and len(M) == 40, f'{len(T)} tx, {len(M)} merchants')
+check('size', 5500 <= len(T) <= 6300 and len(M) == 40, f'{len(T)} tx, {len(M)} merchants')
 # 1: Acquirer C RuPay gap
 c = [r for r in T if r[2] == 2 and r[3] <= 1]; p = [r for r in T if r[2] != 2 and r[3] <= 1]
 gap = rate(p) - rate(c)
@@ -46,5 +46,5 @@ def auth(rows): return 100*sum(r[6]==4 for r in rows)/len(rows)
 va = [r for r in T if r[3]==2 and r[2]==0]; vo = [r for r in T if r[3]==2 and r[2]!=0]
 check('pattern7 Visa auth failures at Acquirer A', auth(va) > 2*auth(vo), f'A {auth(va):.1f}% vs others {auth(vo):.1f}%')
 # enable flags
-check('enable flags', all(len(m['enabled']) == 7 for m in M) and any(not m['enabled'][5] for m in M), 'flags present')
+check('enable flags', all(len(m['enabled']) == 9 for m in M) and any(not m['enabled'][5] for m in M), 'flags present')
 sys.exit(1 if fails else 0)

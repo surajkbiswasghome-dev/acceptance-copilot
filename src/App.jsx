@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useKey } from './lib/store.js';
 import { ROLES, roleById } from './lib/roles.js';
 import { audit, conn } from './lib/db.js';
 import { Logo } from './ui.jsx';
+const Insights = lazy(() => import('./screens/Insights.jsx'));
 import Diagnose from './screens/Diagnose.jsx';
 import Explain from './screens/Explain.jsx';
 import Recommend from './screens/Recommend.jsx';
@@ -14,9 +15,9 @@ import Brief from './screens/Brief.jsx';
 import Account from './screens/Account.jsx';
 import Login from './screens/Login.jsx';
 
-const LABEL = { diagnose: 'Diagnose', explain: 'Explain', recommend: 'Recommend', proposals: 'Proposals', enable: 'Enablement', tickets: 'Tickets', pilot: 'Pilot', brief: 'Brief' };
-const SCREENS = { diagnose: Diagnose, explain: Explain, recommend: Recommend, proposals: Proposals, enable: Enable, tickets: Tickets, pilot: Pilot, brief: Brief, account: Account };
-const useRoute = () => { const get = () => (location.hash.replace('#/', '') || 'diagnose').split('?')[0]; const [r, setR] = useState(get); useEffect(() => { const f = () => setR(get()); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []); return r; };
+const LABEL = { insights: 'Insights', diagnose: 'Diagnose', explain: 'Explain', recommend: 'Recommend', proposals: 'Proposals', enable: 'Enablement', tickets: 'Tickets', pilot: 'Pilot', brief: 'Brief' };
+const SCREENS = { insights: Insights, diagnose: Diagnose, explain: Explain, recommend: Recommend, proposals: Proposals, enable: Enable, tickets: Tickets, pilot: Pilot, brief: Brief, account: Account };
+const useRoute = () => { const get = () => (location.hash.replace('#/', '') || 'insights').split('?')[0]; const [r, setR] = useState(get); useEffect(() => { const f = () => setR(get()); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []); return r; };
 
 export default function App() {
   const [user, setUser] = useKey('ac_user', null);
@@ -26,7 +27,7 @@ export default function App() {
   useEffect(() => { document.documentElement.dataset.theme = theme; const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = theme === 'dark' ? '#0A1020' : '#F3F2ED'; }, [theme]);
   useEffect(() => { setOpen(false); setMore(false); window.scrollTo(0, 0); }, [route]);
   useEffect(() => { const f = () => { conn.setLocal(); setUser(null); location.hash = ''; }; addEventListener('ac-unauth', f); return () => removeEventListener('ac-unauth', f); }, []);
-  if (!user || !ROLES.some(r => r.id === user)) return <Login theme={theme} setTheme={setTheme} onLogin={r => { setUser(r.id); audit(r.name, 'Signed in', 'Workspace'); location.hash = '#/diagnose'; }} />;
+  if (!user || !ROLES.some(r => r.id === user)) return <Login theme={theme} setTheme={setTheme} onLogin={r => { setUser(r.id); audit(r.name, 'Signed in', 'Workspace'); location.hash = '#/insights'; }} />;
   const role = roleById(user);
   const signOut = () => { audit(role.name, 'Signed out', 'Workspace'); conn.setLocal(); setUser(null); location.hash = ''; };
   const allowed = route === 'account' || role.views.includes(route);
@@ -35,7 +36,7 @@ export default function App() {
   return (
     <div className="shell">
       <header className="top">
-        <a href="#/diagnose" className="brand"><Logo />Acceptance Copilot</a>
+        <a href="#/insights" className="brand"><Logo />Acceptance Copilot</a>
         <nav className="nav" aria-label="Views">{role.views.map(k => <a key={k} href={'#/' + k} className={route === k ? 'on' : ''} aria-current={route === k ? 'page' : undefined}>{LABEL[k]}</a>)}</nav>
         <div style={{ flex: 1 }} className="spacer" />
         <div className="tools" style={{ position: 'relative' }}>
@@ -45,7 +46,7 @@ export default function App() {
           {open && <div className="menu" role="menu"><span className="who"><b>{role.name}</b><small>{role.email}</small></span><a href="#/account">Account, settings and audit log</a><button onClick={signOut}>Sign out</button></div>}
         </div>
       </header>
-      <main className="page fade" key={route}><Screen role={role} /></main>
+      <main className="page fade" key={route}><Suspense fallback={<div className="mute">Loading…</div>}><Screen role={role} /></Suspense></main>
       <nav className="bottom" aria-label="Views" style={{ gridTemplateColumns: `repeat(${bottom.length + (rest.length ? 1 : 0)},1fr)` }}>
         {bottom.map(k => <a key={k} href={'#/' + k} className={route === k ? 'on' : ''}>{LABEL[k]}</a>)}
         {rest.length > 0 && <a href="#" className={rest.includes(route) || route === 'account' ? 'on' : ''} onClick={e => { e.preventDefault(); setMore(!more); }}>More</a>}

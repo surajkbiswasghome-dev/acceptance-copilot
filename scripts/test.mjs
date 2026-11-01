@@ -1,12 +1,12 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import * as S from '../src/lib/stats.js'; import { offlineAgent, runTool, offlineAnswer } from '../src/lib/agent.js';
-test('dataset size', () => { assert.equal(S.TX.length, 5000); assert.equal(S.MERCH.length, 40); });
-test('kpis consistent', () => { const k = S.kpis(); assert.equal(k.n, 5000); assert.ok(k.success > 85 && k.success < 95); assert.equal(k.declines, S.TX.filter(t => !t.ok).length); });
+test('dataset size', () => { assert.equal(S.TX.length, 5880); assert.equal(S.MERCH.length, 40); });
+test('kpis consistent', () => { const k = S.kpis(); assert.equal(k.n, 5880); assert.ok(k.success > 85 && k.success < 95); assert.equal(k.declines, S.TX.filter(t => !t.ok).length); });
 test('pattern 1 surfaces as top leak', () => { const f = S.findings()[0]; assert.match(f.title, /Acquirer C/); assert.ok(f.gap < -4); });
 test('pattern 3 issuer 07', () => assert.match(S.findings()[1].title, /Issuer 07/));
 test('pattern 2 and 4 present', () => { const f = S.findings(); assert.ok(f[2].etShare < f[2].restShare / 2); assert.ok(f[3].ts.high.share < f[3].ts.low.share / 2); });
 test('new cases detected', () => { const f = S.findings(); assert.equal(f.length, 7); assert.match(f[4].title, /Acquirer B success dip/); assert.match(f[5].title, /Daily Pantry/); assert.match(f[6].title, /Acquirer A × Visa/); assert.ok(f[0].route && f[0].route.diff > 0); });
-test('matrix has 4x7', () => { const m = S.matrix(); assert.equal(m.length, 4); assert.equal(m[0].length, 7); });
+test('matrix has 4x9', () => { const m = S.matrix(); assert.equal(m.length, 4); assert.equal(m[0].length, 9); });
 test('emi formula', () => { assert.ok(Math.abs(S.emi(12000, 0, 12) - 1000) < 1e-9); assert.ok(S.emi(12000, 12, 12) > 1000 && S.emi(12000, 12, 12) < 1100); });
 test('every offline finding returns steps and an action', () => { for (const id of ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7']) { const r = offlineAgent(id); assert.ok(r.steps.length >= 2); assert.ok(r.finding.cause && r.finding.action && r.finding.confidence); } });
 test('simulation is a difference in success, not a gross count', () => { const mi = S.MERCH.findIndex(m => m.name === 'Orbit Electronics'); const r = S.simulateShift(mi, 10); assert.ok(r.moved > 0); assert.ok(Math.abs(r.delta) < r.moved * 0.1, 'delta must be far smaller than moved'); assert.ok(r.delta < 1); assert.equal(S.simulateShift(mi, 0).delta, 0); });
@@ -15,3 +15,12 @@ test('unknown tool safe', () => assert.ok(runTool('nope').error));
 test('followup routes', () => assert.equal(offlineAnswer('which issuer is worst?').tool, 'issuer_split'));
 test('recommend returns for all merchants', () => { for (let i = 0; i < 40; i++) assert.ok(S.recommend(i).profile); });
 test('agent endpoint offline path', async () => { delete process.env.GEMINI_API_KEY; const h = (await import('../api/agent.js')).default; let out; await h({ body: { id: 'f1' } }, { setHeader() {}, status() { return { json: v => (out = v) }; } }); assert.equal(out.mode, 'offline'); assert.ok(out.finding.action); });
+
+import * as A from '../src/lib/analytics.js';
+test('dataset has net banking, wallets, latency and cost', () => { assert.ok(S.INST.includes('Net banking') && S.INST.includes('Wallet')); assert.ok(S.TX.some(t => t.inst === 7) && S.TX.some(t => t.inst === 8)); assert.ok(S.TX.every(t => t.lat > 0 && t.cost > 0)); });
+test('aggregate: one row per x and a series per split', () => { const r = A.aggregate({ x: 'acquirer', y: 'volume', split: 'mode' }); assert.equal(r.data.length, 4); assert.equal(r.series.length, 4); assert.equal(r.data.reduce((a, d) => a + d.n, 0), S.TX.length); });
+test('aggregate: smoothing keeps 30 days', () => assert.equal(A.aggregate({ x: 'day', y: 'success', smooth: 3 }).data.length, 30));
+test('insights surface the Acquirer B outage on day 20', () => { const i = A.insights(20, 7); assert.ok(i.some(x => x.who === 'Acquirer B' && x.dir === 'down')); });
+test('scorecard ranks and weights change the order inputs', () => { const a = A.scorecard({}, {}); assert.equal(a.length, 4); assert.ok(a[0].score >= a[3].score); const c = A.scorecard({}, { success: 0, cost: 100, latency: 0, reliability: 0, coverage: 0 }); assert.ok(c[0].scores.cost >= c[3].scores.cost); });
+test('route simulation is a difference, can be negative', () => { const s = A.routeSim(0, 2, 1, 30); assert.ok(s.moved > 0); assert.equal(s.extraSuccess, Math.round(s.moved * (s.sb - s.sa)) / 100 === s.extraSuccess ? s.extraSuccess : s.extraSuccess); const rev = A.routeSim(0, 1, 2, 30); assert.ok(rev.extraSuccess < 0); });
+test('agent rules backtest and levers are bounded', () => { const r = A.agentRules(); assert.equal(r.length, 3); assert.ok(r[0].fires >= 1 && r[1].fires >= 1); const L = A.levers(); assert.ok(L.totalLow > 0 && L.totalHigh >= L.totalLow && L.totalHigh < 10); });

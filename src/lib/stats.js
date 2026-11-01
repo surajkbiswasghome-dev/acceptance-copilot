@@ -4,7 +4,7 @@ import ds from '../data/dataset.js';
 export const { acquirers: ACQ, instruments: INST, issuers: ISS, declines: DEC, merchants: MERCH } = ds;
 export const DECLINE_LABEL = { timeout: 'Timeouts', issuer_decline: 'Issuer declines', insufficient_funds: 'Insufficient funds', auth_failed: 'Authentication failed', risk: 'Risk rules', config: 'Configuration' };
 export const HIGH_TICKET = 25000;
-export const TX = ds.tx.map(r => ({ day: r[0], m: r[1], acq: r[2], inst: r[3], iss: r[4], amt: r[5], st: r[6], ok: r[6] === 0, cat: MERCH[r[1]].category }));
+export const TX = ds.tx.map(r => ({ day: r[0], m: r[1], acq: r[2], inst: r[3], iss: r[4], amt: r[5], st: r[6], ok: r[6] === 0, lat: r[7], cost: r[8], cat: MERCH[r[1]].category, seg: MERCH[r[1]].segment }));
 
 const pct = (a, b) => (b ? (100 * a) / b : null);
 const r1 = x => (x == null ? null : Math.round(x * 10) / 10);
