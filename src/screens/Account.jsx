@@ -10,7 +10,7 @@ export default function Account({ role }) {
   const canSet = ['pm', 'head'].includes(role.id);
   const saveSet = async () => { await put('settings', { id: 'main', devopsEmail: (dv ?? settings.devopsEmail).trim(), approverEmail: (ap ?? settings.approverEmail).trim() }); await audit(role.name, 'Updated notification settings', 'Account'); setDv(null); setAp(null); };
   const out = () => { audit(role.name, 'Signed out', 'Workspace'); conn.setLocal(); localStorage.removeItem('ac_user'); location.hash = ''; location.reload(); };
-  const con = [['Shared storage', st?.storage, 'Tickets and proposals are shared between users and devices.', 'Without it, data stays in this browser only.'], ['Email (Gmail)', st?.email, 'Proposals, tickets and the brief can be emailed.', 'Without it, emails show as previews and nothing is sent.'], ['Telegram', st?.telegram, 'Alerts and the brief go to the team chat.', 'Without it, Telegram alerts show as previews.']];
+  const con = [['Shared storage', st?.storage, 'Tickets and proposals are shared between users and devices.', 'Without it, data stays in this browser only.'], ['Email (Gmail)', st?.email, 'Proposals, tickets and the brief can be emailed.', 'Without it, emails show as previews and nothing is sent.'], ['Voice calls (Vapi)', st?.voice, 'The agent can phone a merchant who asks for a call.', 'Without it, a call shows the script as a preview and nothing is dialled.'], ['Telegram', st?.telegram, 'Alerts and the brief go to the team chat.', 'Without it, Telegram alerts show as previews.']];
   return (
     <>
       <Head title="Account" sub="Your role, connections, notification settings and a record of every action." right={<button className="btn" onClick={out}>Sign out</button>} />

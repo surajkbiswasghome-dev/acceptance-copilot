@@ -14,3 +14,16 @@ export const Mic = ({ onText }) => {
   const go = () => { const r = new SR(); r.lang = 'en-IN'; r.onresult = e => onText(e.results[0][0].transcript); r.onend = () => setOn(false); setOn(true); r.start(); };
   return (<button type="button" className="iconbtn" style={{ width: 46, height: 46, borderColor: on ? 'var(--acc)' : undefined }} aria-label="Speak a question" onClick={go}><svg width="20" height="20" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="6.5" y="1.8" width="5" height="9" rx="2.5" /><path d="M3.6 8.6a5.4 5.4 0 0010.8 0M9 14v2.4" /></svg></button>);
 };
+
+const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/;
+export const isEmail = v => EMAIL_RE.test(v);
+// Email tiles: type or paste addresses, separated by comma, space, semicolon or Enter. Backspace removes the last tile.
+export function ChipInput({ value, onChange, placeholder, label }) {
+  const [draft, setDraft] = React.useState('');
+  const add = raw => { const parts = String(raw).split(/[,;\s]+/).map(x => x.trim().toLowerCase()).filter(Boolean); if (!parts.length) return; onChange([...value, ...parts.filter((x, i) => !value.includes(x) && parts.indexOf(x) === i)]); setDraft(''); };
+  const key = e => { if (['Enter', ',', ';', ' ', 'Tab'].includes(e.key) && draft.trim()) { e.preventDefault(); add(draft); } else if (e.key === 'Backspace' && !draft && value.length) onChange(value.slice(0, -1)); };
+  return (<label className="field"><span>{label}</span><div className="chips" onClick={e => e.currentTarget.querySelector('input')?.focus()}>
+    {value.map(v => <span key={v} className={'chip' + (isEmail(v) ? '' : ' bad')}>{v}<button type="button" aria-label={'Remove ' + v} onClick={() => onChange(value.filter(x => x !== v))}>×</button></span>)}
+    <input type="text" inputMode="email" value={draft} placeholder={value.length ? '' : placeholder} onChange={e => { const v = e.target.value; if (/[,;\s]$/.test(v)) add(v); else setDraft(v); }} onKeyDown={key} onBlur={() => add(draft)} onPaste={e => { const t = e.clipboardData.getData('text'); if (/[,;\s]/.test(t.trim())) { e.preventDefault(); add(t); } }} />
+  </div></label>);
+}

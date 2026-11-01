@@ -10,7 +10,7 @@ export const env = () => ({
   tgToken: process.env.TELEGRAM_BOT_TOKEN || '', tgChat: process.env.TELEGRAM_CHAT_ID || '', tgAllow: (process.env.ALLOWED_TELEGRAM_CHATS || process.env.TELEGRAM_CHAT_ID || '').split(',').map(x => x.trim()).filter(Boolean),
   demoPassword: process.env.DEMO_PASSWORD || 'demo-demo-demo', briefTo: process.env.BRIEF_EMAIL || process.env.GMAIL_USER || ''
 });
-export const status = () => { const e = env(); return { server: !!(e.secret && (e.redisUrl || globalThis.__REDIS_STUB)), storage: !!(e.redisUrl || globalThis.__REDIS_STUB), email: !!(e.gmailUser && e.gmailPass) || !!globalThis.__MAIL_CAPTURE, telegram: !!(e.tgToken && e.tgChat) || !!globalThis.__TG_CAPTURE }; };
+export const status = () => { const e = env(); return { server: !!(e.secret && (e.redisUrl || globalThis.__REDIS_STUB)), storage: !!(e.redisUrl || globalThis.__REDIS_STUB), email: !!(e.gmailUser && e.gmailPass) || !!globalThis.__MAIL_CAPTURE, telegram: !!(e.tgToken && e.tgChat) || !!globalThis.__TG_CAPTURE, voice: !!(process.env.VAPI_API_KEY && process.env.VAPI_PHONE_NUMBER_ID && process.env.VAPI_ASSISTANT_ID) }; };
 
 const b64 = b => Buffer.from(b).toString('base64url');
 export const hmac = (data) => crypto.createHmac('sha256', env().secret).update(data).digest('base64url');

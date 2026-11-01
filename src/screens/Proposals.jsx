@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as S from '../lib/stats.js';
 import { proposalEmail } from '../lib/email.js';
-import { useColl, put, audit, uid } from '../lib/db.js';
+import { useColl, put, audit, uid, callApi, conn } from '../lib/db.js';
 import { notify, statusPill, statusText } from '../lib/notify.js';
-import { Head } from '../ui.jsx';
+import { Head, ChipInput, isEmail } from '../ui.jsx';
 
 export const PSTATUS = { draft: ['Draft', ''], sent: ['Sent, awaiting reply', 'warn'], interested: ['Interested', 'ok'], wants_call: ['Wants a call', 'warn'], not_now: ['Not now', 'bad'], live: ['Live', 'ok'] };
 const fromHash = () => (location.hash.split('?id=')[1] || '').split('&')[0] || null;
 export default function Proposals({ role }) {
   const all = useColl('proposals'); const notes = useColl('notifications');
-  const [sel, setSel] = useState(fromHash()); const [to, setTo] = useState(''); const [viaEmail, setViaEmail] = useState(true); const [viaTg, setViaTg] = useState(false); const [tgId, setTgId] = useState(''); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState(null);
+  const [sel, setSel] = useState(fromHash()); const [to, setTo] = useState([]); const [phone, setPhone] = useState(''); const [callMsg, setCallMsg] = useState(null); const [viaEmail, setViaEmail] = useState(true); const [viaTg, setViaTg] = useState(false); const [tgId, setTgId] = useState(''); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState(null);
   const [nm, setNm] = useState(S.MERCH.findIndex(m => m.category === 'Electronics')); const [ni, setNi] = useState([5]);
   useEffect(() => { const f = () => setSel(fromHash()); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
   const rows = [...all].sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
@@ -19,11 +19,18 @@ export default function Proposals({ role }) {
   const create = async () => { const now = new Date().toISOString(); const id = uid('PRP'); await put('proposals', { id, merchantId: nm, instruments: ni, status: 'draft', created: now, ts: now, events: [{ ts: now, who: role.name, text: 'Draft created' }] }); await audit(role.name, 'Created proposal', S.MERCH[nm].name, id); setSel(id); history.replaceState(null, '', '#/proposals?id=' + id); };
   const ev = (text, extra = {}) => put('proposals', { ...p, ...extra, events: [...p.events, { ts: new Date().toISOString(), who: role.name, text }] });
   const send = async () => {
-    setBusy(true); setMsg(null); const list = viaEmail ? to.split(/[,;\s]+/).filter(x => x.includes('@')) : [];
+    setBusy(true); setMsg(null); const list = viaEmail ? to.filter(isEmail) : [];
     const r = await notify({ kind: 'proposal', id: p.id, to: list, channels: { email: viaEmail, telegram: viaTg }, tgTo: viaTg ? tgId.trim() : '', refId: p.id });
     const ok = r.some(x => x.status === 'sent'); const prev = r.some(x => x.status === 'preview');
     if (prev && !ok) await ev('Proposal prepared for ' + (list.join(', ') || 'merchant') + ' (preview only, email not connected)', { status: 'sent', sentAt: new Date().toISOString(), sentTo: list.join(', '), previewOnly: true });
     await audit(role.name, ok ? 'Sent proposal' : 'Prepared proposal', S.MERCH[p.merchantId].name, p.id); setMsg(r); setBusy(false);
+  };
+  const call = async () => {
+    setBusy(true); setCallMsg(null); let r;
+    if (conn.mode() === 'server') { try { r = (await callApi('/api/call', { id: p.id, number: phone })).result; } catch (e) { r = { channel: 'call', to: phone, status: 'failed', note: 'The server could not start the call' }; } }
+    else r = { channel: 'call', to: phone, status: 'preview', note: 'Voice calling is not connected in this workspace. Nothing was dialled.' };
+    await put('notifications', { id: uid('NTF') + Math.random().toString(36).slice(2, 5), ts: new Date().toISOString(), refId: p.id, kind: 'call', ...r });
+    if (r.status === 'preview') await ev('Call prepared for ' + phone + ' (preview only, voice not connected)'); await audit(role.name, r.status === 'sent' ? 'Started voice call' : 'Prepared voice call', S.MERCH[p.merchantId].name, p.id); setCallMsg(r); setBusy(false);
   };
   const simulate = (k, label) => ev('Simulated merchant reply: ' + label + ' (demo)', { status: k, intentAt: new Date().toISOString(), simulated: true });
   return (
@@ -46,10 +53,15 @@ export default function Proposals({ role }) {
           {['draft', 'sent'].includes(p.status) && canEdit && <div className="col" style={{ gap: 8 }}>
             <span className="eyebrow">Send by</span>
             <div className="row wrap"><label className="row"><input type="checkbox" checked={viaEmail} onChange={e => setViaEmail(e.target.checked)} />Email</label><label className="row"><input type="checkbox" checked={viaTg} onChange={e => setViaTg(e.target.checked)} />Telegram</label></div>
-            {viaEmail && <label className="field"><span>Email address</span><input type="text" placeholder="merchant contact email (use your own address for the demo)" value={to} onChange={e => setTo(e.target.value)} /></label>}
+            {viaEmail && <ChipInput label="Email addresses" value={to} onChange={setTo} placeholder="Type or paste addresses. Press comma, space or Enter to add each one." />}
             {viaTg && <label className="field"><span>Telegram chat ID</span><input type="text" inputMode="numeric" placeholder="e.g. 852893915 (the person must have started the bot first)" value={tgId} onChange={e => setTgId(e.target.value)} /></label>}
-            <div className="row wrap"><button className="btn pri" disabled={busy || (!viaEmail && !viaTg) || (viaEmail && !to.includes('@')) || (viaTg && !/^-?\d{5,}$/.test(tgId.trim()))} onClick={send}>{busy ? 'Sending…' : p.status === 'sent' ? 'Send again' : 'Send proposal'}</button></div>
+            <div className="row wrap"><button className="btn pri" disabled={busy || (!viaEmail && !viaTg) || (viaEmail && !(to.length && to.every(isEmail))) || (viaTg && !/^-?\d{5,}$/.test(tgId.trim()))} onClick={send}>{busy ? 'Sending…' : p.status === 'sent' ? 'Send again' : 'Send proposal'}</button></div>
             {msg && msg.map((x, i) => <div key={i} className="row wrap sm"><span className={'pill ' + statusPill(x.status)}>{statusText(x.status)}</span><span>{x.channel}{x.to ? ' to ' + x.to : ''}</span>{x.note && <span className="mute">{x.note}</span>}</div>)}</div>}
+          {['draft', 'sent', 'wants_call', 'interested'].includes(p.status) && canEdit && <div className="col" style={{ gap: 8 }}>
+            <span className="eyebrow">Call the merchant{p.status === 'wants_call' ? ' (they asked for a call)' : ''}</span>
+            <span className="mute sm">An AI voice agent introduces itself, asks one question and records the outcome here. Use the international format.</span>
+            <div className="row wrap"><input type="text" inputMode="tel" style={{ maxWidth: 260 }} placeholder="+919876543210" value={phone} onChange={e => setPhone(e.target.value)} aria-label="Merchant phone number" /><button className="btn" disabled={busy || !/^\+[1-9][\d\s-]{7,16}$/.test(phone.trim())} onClick={call}>Call with voice agent</button></div>
+            {callMsg && <div className="col" style={{ gap: 4 }}><div className="row wrap sm"><span className={'pill ' + statusPill(callMsg.status)}>{statusText(callMsg.status)}</span><span>call to {callMsg.to}</span><span className="mute">{callMsg.note}</span></div>{callMsg.script && <span className="mute sm">Opening line: “{callMsg.script}”</span>}</div>}</div>}
           {p.previewOnly && <div className="banner">Preview only. Email is not connected in this workspace, so nothing was actually sent.</div>}
           {['draft', 'sent', 'wants_call'].includes(p.status) && canEdit && <div className="col" style={{ gap: 6 }}><span className="eyebrow">Demo: simulate the merchant’s reply</span><span className="mute sm">Real merchants reply with the email buttons. This stands in for that while the merchant is fictional.</span><div className="row wrap"><button className="btn" onClick={() => simulate('interested', 'Interested')}>Interested</button><button className="btn" onClick={() => simulate('wants_call', 'Wants a call')}>Wants a call</button><button className="btn" onClick={() => simulate('not_now', 'Not now')}>Not now</button></div></div>}
           {p.status === 'interested' && <div className="insight row between wrap"><span><b>Merchant is interested.</b> The enablement checklist is ready.</span><a className="btn pri" href={'#/enable?id=' + p.id}>Open in enablement</a></div>}

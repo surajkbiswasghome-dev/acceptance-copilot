@@ -62,3 +62,10 @@ table{border-collapse:collapse;width:100%;font-size:14px}th{text-align:left;font
 .chiprow{display:flex;gap:8px;flex-wrap:wrap}.tag{font-size:12px;font-weight:600;border-radius:8px;padding:2px 8px;background:var(--s2);border:1px solid var(--line)}
 .sparkline{width:100%;height:150px}.trendwrap{overflow:hidden}
 @media(max-width:900px){.hide-sm{display:none}.split{grid-template-columns:1fr!important}}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:6px 10px;min-height:46px;cursor:text}
+.chips:focus-within{border-color:var(--acc)}
+.chips input{flex:1;min-width:160px;border:0;background:transparent;min-height:32px;padding:0;outline:0}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--s2,rgba(120,140,200,.14));border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px}
+.chip.bad{border-color:#E5484D;color:#E5484D}
+.chip button{border:0;background:transparent;color:inherit;font-size:16px;line-height:1;cursor:pointer;padding:0 4px;min-height:0}
