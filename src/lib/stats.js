@@ -195,3 +195,18 @@ export function proposalCandidates(findingId) {
   });
   return out;
 }
+
+// Per-merchant outcome split and an assumption-driven potential range for a credit-line style option.
+// Assumption (stated in the email): a share of "insufficient funds" failures could complete through a credit line.
+export const POTENTIAL_ASSUMPTION = { low: 0.10, high: 0.25 };
+export function merchantPotential(mi) {
+  const rows = TX.filter(t => t.m === mi); const n = rows.length || 1;
+  const ok = rows.filter(t => t.st === 0).length, ins = rows.filter(t => t.st === 3).length, other = rows.length - ok - ins;
+  // With few events the merchant's own share is too noisy, so fall back to merchants in the same category.
+  const catRows = TX.filter(t => t.cat === MERCH[mi].category); const catIns = 100 * catRows.filter(t => t.st === 3).length / (catRows.length || 1);
+  const own = ins >= 5; const insPct = own ? 100 * ins / n : catIns; const p = merchantProfile(mi);
+  const lowPts = Math.round(insPct * POTENTIAL_ASSUMPTION.low * 100) / 100, highPts = Math.round(insPct * POTENTIAL_ASSUMPTION.high * 100) / 100;
+  const per1000 = [Math.round(insPct * POTENTIAL_ASSUMPTION.low * 10), Math.round(insPct * POTENTIAL_ASSUMPTION.high * 10)];
+  return { n: rows.length, basis: own ? 'your payments' : 'merchants like you', successPct: r1(100 * ok / n), insPct: r1(insPct), otherPct: r1(100 * other / n), okPct: r1(100 * ok / n), lowPts, highPts, per1000, avgTicket: p.avgTicket,
+    valuePer1000: [per1000[0] * p.avgTicket, per1000[1] * p.avgTicket] };
+}
