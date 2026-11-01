@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { ROLES } from '../lib/roles.js';
 import { conn } from '../lib/db.js';
 import { Logo } from '../ui.jsx';
+import { LANGS, DEFAULT_LANG } from '../lib/lang.js';
 import { matrix, statusOf } from '../lib/stats.js';
 import { useKey } from '../lib/store.js';
 export default function Login({ onLogin, theme, setTheme }) {
-  const [i, setI] = useState(0); const r = ROLES[i]; const [pw, setPw] = useState('demo-demo-demo'); const [nm, setNm] = useState(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } }); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const [i, setI] = useState(0); const r = ROLES[i]; const [pw, setPw] = useState('demo-demo-demo'); const [nm, setNm] = useState(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } }); const [lang, setLang] = useState({}); const L = lang[r.id] || (() => { try { return localStorage.getItem('ac_lang_' + r.id); } catch { return null; } })() || DEFAULT_LANG[r.id] || 'en'; const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const [, setStatus] = useKey('ac_status', null);
   const cells = matrix().flat().slice(0, 21);
   const go = async () => {
@@ -17,7 +18,7 @@ export default function Login({ onLogin, theme, setTheme }) {
       if (j.mode === 'server') conn.setServer(j.token); else conn.setLocal();
       setStatus(j.status || null);
     } catch { conn.setLocal(); setStatus(null); }
-    try { localStorage.setItem('ac_name', nm.trim() || 'Suraj'); } catch {} setBusy(false); onLogin(r);
+    try { localStorage.setItem('ac_name', nm.trim() || 'Suraj'); localStorage.setItem('ac_lang_' + r.id, L); } catch {} setBusy(false); onLogin(r);
   };
   return (
     <div className="login">
@@ -34,6 +35,7 @@ export default function Login({ onLogin, theme, setTheme }) {
         <div className="row between"><div className="col" style={{ gap: 2 }}><h2 style={{ fontSize: 24, letterSpacing: '-.02em' }}>Sign in</h2><span className="mute sm">Choose a demo account</span></div><button className="btn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Ivory & Ink' : 'Midnight'}</button></div>
         <div className="col" role="group" aria-label="Demo accounts">{ROLES.map((x, k) => <button key={x.id} className={'role' + (k === i ? ' on' : '')} aria-pressed={k === i} onClick={() => setI(k)}><span className="av">{x.short}</span><span className="col" style={{ gap: 0 }}><b>{x.name}</b><span className="mute sm">{x.sub}</span></span></button>)}</div>
         <label className="col" style={{ gap: 4 }}><span className="sm mute">Your name (for the welcome)</span><input type="text" value={nm} onChange={e => setNm(e.target.value)} /></label>
+        <div className="col" style={{ gap: 6 }} role="radiogroup" aria-label="Welcome language"><span className="sm mute">Welcome message language (the rest of the platform stays in English)</span><div className="row wrap">{LANGS.map(x => <label key={x.id} className="row sm" style={{ gap: 6, border: '1px solid var(--line)', borderRadius: 999, padding: '6px 14px', background: L === x.id ? 'color-mix(in srgb, var(--acc) 18%, var(--s1))' : 'transparent', cursor: 'pointer' }}><input type="radio" name="wl" checked={L === x.id} onChange={() => setLang(v => ({ ...v, [r.id]: x.id }))} />{x.label}</label>)}</div></div>
         <label className="col" style={{ gap: 4 }}><span className="sm mute">Email</span><input type="email" readOnly value={r.email} /></label>
         <label className="col" style={{ gap: 4 }}><span className="sm mute">Password</span><input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} /></label>
         {err && <div className="err sm">{err}</div>}

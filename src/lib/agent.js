@@ -1,5 +1,6 @@
 // The agent's tools and an offline (rules) agent. The same tools run in the browser and in the Vercel function.
 import * as S from './stats.js';
+import { dataAnswer } from './qa.js';
 
 export const TOOL_DEFS = [
   { name: 'compare_acquirers', description: 'Success rate of each acquirer on RuPay payments against the other acquirers.', parameters: { type: 'OBJECT', properties: {} } },
@@ -95,6 +96,7 @@ export function offlineAgent(id) {
 // Keyword routing for follow-up questions when Gemini is unavailable.
 import { inScope, OFF_TOPIC } from './guard.js';
 export function offlineAnswer(q) {
+  const _d = inScope(q) && dataAnswer(q); if (_d) return _d;
   if (!inScope(q)) return { tool: 'guardrail', answer: OFF_TOPIC, guard: true };
   const s = q.toLowerCase();
   if (/issuer/.test(s)) { const r = runTool('issuer_split'); const t = top(r, 'issuerDeclineRate'); return { tool: 'issuer_split', answer: t.issuer + ' has the highest issuer-decline rate at ' + t.issuerDeclineRate + '% across n = ' + t.n + ' payments.' }; }

@@ -2,6 +2,9 @@
 // All evidence is computed by the tools in code first; Gemini only writes the explanation from that evidence.
 import { offlineAgent, offlineAnswer } from '../src/lib/agent.js';
 import * as S from '../src/lib/stats.js';
+import { dataAnswer, snapshot } from '../src/lib/qa.js';
+import { inScope, OFF_TOPIC } from '../src/lib/guard.js';
+import { HELP } from '../src/lib/help.js';
 
 const MODELS = [process.env.GEMINI_MODEL, 'gemini-3.8-flash', 'gemini-flash-latest'].filter(Boolean);
 const URL_ = (key, model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
@@ -44,13 +47,16 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const key = process.env.GEMINI_API_KEY;
-  const fallback = reason => res.status(200).json({ ...(body.question ? offlineAnswer(body.question) : offlineAgent(body.id)), mode: 'offline', reason });
+  const fallback = reason => res.status(200).json({ ...(body.question ? (dataAnswer(String(body.question)) || offlineAnswer(body.question)) : offlineAgent(body.id)), mode: 'offline', reason });
   if (!key) return fallback('GEMINI_API_KEY is not set on the server (add it in Vercel and redeploy)');
   try {
     if (body.question) {
-      const facts = offlineAnswer(body.question); if (facts.guard) return res.status(200).json({ tool: 'guardrail', answer: facts.answer, mode: 'guardrail' }); const all = S.findings().map(f => f.title + ': ' + f.subtitle).join(' | ');
-      const text = await ask(key, `Question: ${body.question}\nComputed evidence (tool ${facts.tool}): ${facts.answer}\nAll flagged findings: ${all}\nAnswer in two sentences using only this evidence. If the question is not about payment acceptance or this platform, say you can only help with those topics.`);
-      return res.status(200).json({ mode: 'live', tool: facts.tool, answer: text.trim() });
+      const q = String(body.question).slice(0, 400); const scr = { screen: body.screen, findingId: body.findingId };
+      if (!inScope(q, scr)) return res.status(200).json({ tool: 'guardrail', answer: OFF_TOPIC, mode: 'guardrail' });
+      const d = dataAnswer(q); const evidence = d ? d.evidence || d.answer : 'No figure could be computed directly from the question.';
+      const help = Object.entries(HELP).filter(([k]) => k === body.screen).map(([, v]) => v).join(' ');
+      const text = await ask(key, `The user is a ${body.role || 'payments acceptance analyst'} using the Acceptance Copilot platform${body.screen ? ', currently on the ' + body.screen + ' screen' + (body.findingId ? ' looking at finding ' + body.findingId : '') : ''}. ${help ? 'This screen: ' + help : ''}\nQuestion: ${q}\nFigures computed in code for this question: ${evidence}\nData snapshot (synthetic, 30 days): ${snapshot()}\nAnswer in two to four plain sentences. Use ONLY the figures above; never invent numbers, never claim proven uplift, and mention a small sample if n is under 30. If the question asks what to do next, say the practical next step on this platform (approve or reject a finding, raise a ticket, request a routing change, create or send a proposal). If the question is clearly unrelated to payment acceptance or this platform, say you can only help with those topics.`);
+      return res.status(200).json({ mode: 'live', tool: d ? d.tool : 'snapshot', answer: text.trim() });
     }
     const f = S.findings().find(x => x.id === body.id);
     if (!f) return res.status(400).json({ error: 'unknown finding' });

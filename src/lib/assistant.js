@@ -3,7 +3,8 @@ import * as S from './stats.js';
 import * as A from './analytics.js';
 import { HELP, TABS } from './help.js';
 import { inScope, OFF_TOPIC } from './guard.js';
-import { offlineAnswer } from './agent.js';
+import { dataAnswer, snapshot } from './qa.js';
+import { slot, welcome } from './lang.js';
 
 export function state(ctx) {
   const f = S.findings(); const decided = new Set((ctx.decisions || []).filter(d => ['approved', 'rejected'].includes(d.status)).map(d => d.id));
@@ -12,22 +13,31 @@ export function state(ctx) {
   const props = ctx.proposals || []; const sent = props.filter(p => p.status === 'sent'), interested = props.filter(p => p.status === 'interested'), calls = props.filter(p => p.status === 'wants_call');
   return { f, undecided, pend, open, sent, interested, calls, top: undecided[0] || f[0] };
 }
-export const greeting = (d = new Date()) => { const h = d.getHours(); return h < 12 ? ['Good morning', 'सुप्रभात'] : h < 17 ? ['Good afternoon', 'नमस्कार'] : ['Good evening', 'शुभ संध्या']; };
-export function welcomeLines(name, ctx, d = new Date()) {
-  const st = state(ctx); const [en, hi] = greeting(d); const bits = [];
-  if (st.undecided.length) bits.push(`${st.undecided.length} finding${st.undecided.length === 1 ? '' : 's'} to decide`);
-  if (st.pend.length) bits.push(`${st.pend.length} routing request${st.pend.length === 1 ? '' : 's'} awaiting approval`);
-  if (st.interested.length + st.calls.length) bits.push(`${st.interested.length + st.calls.length} merchant repl${st.interested.length + st.calls.length === 1 ? 'y' : 'ies'} to follow up`);
-  const l1 = `Welcome ${name} to Acceptance Copilot. ${hi}! ${en}.`;
-  const l2 = (bits.length ? `You have ${bits.join(', ')}. ` : 'Nothing is waiting on you right now. ') + (st.top ? `Biggest leak: ${st.top.title}. ` : '') + 'How may I help you?';
-  return { l1, l2, en, hi, parts: [{ text: `Welcome ${name}, to Acceptance Copilot.`, lang: 'en-IN' }, { text: hi + '!', lang: 'hi-IN' }, { text: `${en}. ${l2}`, lang: 'en-IN' }] };
+export const greeting = (d = new Date()) => { const i = slot(d); return [['Good morning', 'सुप्रभात'], ['Good afternoon', 'नमस्कार'], ['Good evening', 'शुभ संध्या']][i]; };
+export function welcomeLines(name, ctx, d = new Date(), lang = 'en') {
+  const st = state(ctx); const w = welcome(lang, name, st, S.kpis().success, d); return { ...w, en: greeting(d)[0], hi: greeting(d)[1] };
 }
+export const screenOf = () => { const h = (typeof location !== 'undefined' ? location.hash : '') || ''; const [path, qs] = h.replace(/^#\/?/, '').split('?'); return { screen: path || 'insights', findingId: (qs || '').match(/id=([^&]+)/)?.[1] }; };
 const L = (label, href) => ({ label, href: '#/' + href });
-export function reply(q, ctx, role) {
+const NEXT = /(what (should|next|now)|what (do|can) i (do|need)|what to do|next step|now what|what('s| is) next|should i|how do i (proceed|move)|what.*(left|remaining)|am i (ready|done))/;
+export function nextStep(ctx, role, scr) {
+  const st = state(ctx); const sc = scr?.screen || 'insights';
+  if (sc === 'explain') {
+    const f = st.f.find(x => x.id === (scr.findingId || 'f1')) || st.f[0]; const d = (ctx.decisions || []).find(x => x.id === f.id)?.status; const tk = (ctx.tickets || []).filter(t => t.findingId === f.id);
+    if (!d) return { text: role?.canApprove ? `For “${f.title}”: read the cause and the evidence, then decide. If you agree, press Approve (nothing changes until you do). If the sample looks small or the cause unclear, ask me a follow-up first, or Reject. After approving, the Actions panel lets you ${f.route ? 'request a routing change' : f.id === 'f3' || f.id === 'f4' ? 'create draft proposals for merchants' : 'raise an investigation ticket'}.` : `For “${f.title}”: review the evidence. Your role cannot approve, so ask the Acceptance PM to approve it; you can raise tickets once it is approved.` };
+    if (d === 'rejected') return { text: `“${f.title}” is rejected and recorded. Press Reopen if new evidence arrives, or move to the next finding in the queue.` };
+    const nxt = f.route ? `Request a routing change (${f.route.from} to ${f.route.to}). It goes to the Head for approval, since the requester cannot approve their own request.` : f.id === 'f3' || f.id === 'f4' ? 'Create draft proposals for the matching merchants in Actions, then open Proposals to preview and send them.' : 'Raise an investigation ticket for DevOps, or escalate to the partner if the cause sits with them.';
+    return { text: `“${f.title}” is approved. Next: ${nxt}${tk.length ? ` ${tk.length} ticket${tk.length === 1 ? ' is' : 's are'} already raised for it.` : ''}`, links: [L('Open Tickets', 'tickets'), L('Open Proposals', 'proposals')] };
+  }
+  const by = { insights: ['Open the biggest signal under “What changed”, break it down in Explore, then check the Routing recommendation. Take the top leak to Diagnose.', [L('Diagnose', 'diagnose')]], diagnose: [`Pick the top leak${st.top ? ' (' + st.top.title + ')' : ''} and press “Investigate with the agent”. That opens Explain, where you can approve it.`, [L('Explain', 'explain')]], recommend: ['Choose a merchant with a coverage gap and create a proposal. Then open Proposals to preview and send it.', [L('Proposals', 'proposals')]], proposals: ['Open a draft, check the email preview, add the merchant’s email or Telegram, and send. A merchant’s one-click reply moves them to Enablement.', [L('Enablement', 'enable')]], enable: ['Open the merchant’s checklist and tick each step as it completes. When the coverage gate is met, start the pilot.', [L('Pilot', 'pilot')]], tickets: [st.pend.length ? `${st.pend.length} routing request${st.pend.length === 1 ? '' : 's'} await${st.pend.length === 1 ? 's' : ''} approval. ${role?.canApproveRouting ? 'Open one and approve it.' : 'Only the Head can approve; ask Meera.'}` : 'Open tickets that need action, and verify fixed ones to close them.', []], pilot: ['Check the coverage gate, run the pilot, then compare the result with the plan.', [L('Brief', 'brief')]], brief: ['Read or listen to the brief, then send it to your email or Telegram.', []] };
+  const x = by[sc]; if (!x) return null; return { text: x[0], links: x[1] };
+}
+export function reply(q, ctx, role, scr) {
   const s = q.toLowerCase().trim(); const st = state(ctx);
-  if (!inScope(q)) return { text: OFF_TOPIC };
+  if (!inScope(q, scr)) return { text: OFF_TOPIC };
   if (/^(hi|hello|hey|namaste)\b/.test(s)) return { text: 'Hello! I can give you today’s update, tell you which tabs to visit, explain any screen, or answer questions about your acceptance data.', chips: true };
-  if (/(today|update|pending|summary|status|what.*(need|waiting))/.test(s)) {
+  if (NEXT.test(s) && !/(today|plan my day|which tab)/.test(s)) { const n = nextStep(ctx, role, scr); if (n) return n; }
+  if (/(today|update|pending|summary|status|what.*(need|waiting))/.test(s) && !/(rate|success|decline|latency|acquirer|issuer|rupay|upi|visa|wallet|reason|fail)/.test(s)) {
     const lines = [`${st.undecided.length} finding${st.undecided.length === 1 ? '' : 's'} waiting for a decision${st.top ? ', biggest: ' + st.top.title : ''}.`, `${st.pend.length} routing request${st.pend.length === 1 ? '' : 's'} awaiting approval, ${st.open.length} other ticket${st.open.length === 1 ? '' : 's'} open.`, `${st.sent.length} proposal${st.sent.length === 1 ? '' : 's'} awaiting a merchant reply, ${st.interested.length + st.calls.length} reply to follow up.`];
     return { text: lines.join('\n'), links: [L('Open the brief', 'brief'), L('Review findings', 'diagnose'), L('Tickets', 'tickets')] };
   }
@@ -42,6 +52,17 @@ export function reply(q, ctx, role) {
   const mod = [['routing', /routing|route|acquirer.*(move|switch)/], ['overview', /overview/], ['explore', /explore/], ['grow', /\bgrow|uplift|lever/], ['insights', /insight/], ['diagnose', /diagnos|heat ?map/], ['explain', /explain/], ['recommend', /recommend/], ['proposals', /proposal/], ['enable', /enabl/], ['tickets', /ticket/], ['pilot', /pilot/], ['brief', /brief/], ['account', /account|audit/]].find(([k, re]) => re.test(s) && /(what|why|how|explain|does|is|for)/.test(s) && /(what is|what does|what\'s|why|purpose|what.*for|how does|how do)/.test(s));
   if (mod) { const t = TABS.find(x => x[0] === (mod[0] === 'overview' || mod[0] === 'explore' || mod[0] === 'routing' || mod[0] === 'grow' ? 'insights' : mod[0])); return { text: HELP[mod[0]], links: t ? [L('Open ' + t[1], t[0])] : [] }; }
   if (/(what can you|help)/.test(s)) return { text: 'I can give today’s update, suggest which tabs to visit, explain any screen, and answer data questions such as “which issuer declines the most?” or “which acquirer is weakest on RuPay?”.', chips: true };
-  const a = offlineAnswer(q); return { text: a.answer, links: a.tool === 'guardrail' ? [] : [L('See it in Insights', 'insights')] };
+  const d = dataAnswer(q);
+  if (d) return { text: d.answer, data: true, evidence: d.evidence || d.answer, links: [L('See it in Insights', 'insights')] };
+  return { text: 'I could not map that to a figure. Try naming an acquirer, instrument, issuer or merchant, and a period, for example “decline reasons for Acquirer B today” or “which issuer declines the most?”.', fallback: true, chips: true };
+}
+// The full path: rules first for navigation and next steps, computed data next, and the AI model (when connected) to phrase it or to answer what the rules could not map.
+export async function askCopilot(q, ctx, role) {
+  const scr = screenOf(); const r = reply(q, ctx, role, scr); if (!r.data && !r.fallback) return r;
+  try {
+    const res = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q, screen: scr.screen, findingId: scr.findingId, role: role?.name }), signal: AbortSignal.timeout(28000) });
+    const j = res.ok ? await res.json() : null; if (j && j.mode === 'live' && j.answer) return { ...r, text: j.answer, live: true, chips: false };
+  } catch (e) { /* offline: show the computed answer */ }
+  return r;
 }
 export const SUGGESTIONS = ['Today’s update', 'Which tabs should I visit today?', 'What does Routing do?', 'Which acquirer is weakest?'];

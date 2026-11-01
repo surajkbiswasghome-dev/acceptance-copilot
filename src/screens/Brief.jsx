@@ -8,7 +8,7 @@ import { Head } from '../ui.jsx';
 export default function Brief({ role }) {
   const tickets = useColl('tickets'), proposals = useColl('proposals'); const b = buildBrief(tickets, proposals);
   const [speaking, setSpeaking] = useState(false); const [msg, setMsg] = useState(null); const [to, setTo] = useState(''); const canSpeak = true;
-  const speak = async () => { if (speaking) { stopSpeech(); setSpeaking(false); return; } setSpeaking(true); let n = 0; const parts = []; for (const t of b.text.split(/\n+/).filter(Boolean)) { if (n + t.length > 650) break; n += t.length; parts.push({ text: t, lang: 'en-IN' }); } await speakText(parts.length ? parts : [{ text: b.text.slice(0, 650), lang: 'en-IN' }], () => setSpeaking(false)); };
+  const speak = async () => { if (speaking) { stopSpeech(); setSpeaking(false); return; } setSpeaking(true); const parts = b.text.split(/\n+/).filter(Boolean).map(t => ({ text: t, lang: 'en-IN' })); await speakText(parts, () => setSpeaking(false)); };
   const send = async ch => { setMsg(null); const r = await notify({ kind: 'brief', id: 'brief', to: ch === 'email' ? to.split(/[,;\s]+/).filter(x => x.includes('@')) : [], channels: { [ch]: true }, refId: 'brief' }); setMsg(r); };
   return (
     <>
