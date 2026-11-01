@@ -15,4 +15,4 @@ export const ROLES = [
 export function audit(who, action, target, detail = '') {
   write('ac_audit', [{ ts: new Date().toISOString(), who, action, target, detail }, ...read('ac_audit', [])].slice(0, 300));
 }
-export const resetDemo = () => { ['ac_audit', 'ac_dec', 'ac_pilot', 'ac_checks'].forEach(k => write(k, k === 'ac_pilot' ? { kill: false } : k === 'ac_audit' ? [] : {})); };
+export const resetDemo = () => { ['ac_audit', 'ac_dec', 'ac_pilot', 'ac_checks'].forEach(k => write(k, k === 'ac_pilot' ? { status: 'planned' } : k === 'ac_audit' ? [] : {})); };

@@ -9,9 +9,9 @@ export default function Recommend() {
   const [price, setPrice] = useState(null); const P = price ?? Math.max(5000, p.avgTicket);
   const [months, setMonths] = useState(6); const [rate, setRate] = useState(14);
   const [fm, setFm] = useState(40); const [fi, setFi] = useState(30); const [fn, setFn] = useState(0);
-  const [shift, setShift] = useState(5); const succ = S.rate(S.TX.filter(t => t.inst === 5)) || 0;
+  const [shift, setShift] = useState(5);
   const e = S.emi(P, rate, months), interest = e * months - P, cust = Math.max(0, 100 - fm - fi - fn), over = fm + fi + fn > 100;
-  const monthly = p.n; const addPay = Math.round(monthly * shift / 100 * succ / 100); const addVal = addPay * p.avgTicket;
+  const sim = S.simulateShift(mi, shift); const sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '') ;
   const money = v => '₹' + Math.round(v).toLocaleString('en-IN');
   return (
     <>
@@ -35,14 +35,16 @@ export default function Recommend() {
           <div className="row between sm"><span>Customer pays</span><b className="num">{cust}% · {money(interest * cust / 100)}</b></div>
           {over ? <div className="err sm">Funding shares add up to more than 100%. Reduce one.</div> : cust === 0 ? <span className="pill ok">No-cost for the customer</span> : null}
           <span className="mute sm">Rates and splits are inputs to explore. They are not commercial terms.</span></div>
-        <div className="card"><span className="eyebrow">Simulation</span><div className="banner">Simulation, not a forecast. Change the assumptions to see what they imply.</div>
-          <label className="col" style={{ gap: 4 }}><span className="row between sm"><span>Payments that move to UPI + RuPay credit</span><b className="num">{shift}%</b></span><input type="range" min="0" max="20" value={shift} onChange={e => setShift(+e.target.value)} /></label>
+        <div className="card"><span className="eyebrow">Simulation</span><div className="banner">Simulation, not a forecast. Change the assumption to see what it implies.</div>
+          <label className="col" style={{ gap: 4 }}><span className="row between sm"><span>Share of payments that move to UPI + RuPay credit</span><b className="num">{shift}%</b></span><input type="range" min="0" max="20" value={shift} onChange={e => setShift(+e.target.value)} /></label>
           <div className="insight col" style={{ gap: 8 }}>
-            <div className="row between sm"><span>Merchant payments in 30 days (data)</span><b className="num">{monthly}</b></div>
-            <div className="row between sm"><span>Success on that instrument (data)</span><b className="num">{succ}%</b></div>
-            <div className="row between"><span>Implied extra successful payments</span><b className="num">{addPay}</b></div>
-            <div className="row between"><span>Implied value at average ticket</span><b className="num">{money(addVal)}</b></div></div>
-          <span className="mute sm">This assumes customers who move would otherwise have used another instrument and succeeded elsewhere. Only a pilot can show a real effect.</span></div>
+            <div className="row between sm"><span>Merchant payments in 30 days (data)</span><b className="num">{sim.n}</b></div>
+            <div className="row between"><span>Payments shifted to this instrument</span><b className="num">{sim.moved}</b></div>
+            <div className="row between sm"><span>Success on this instrument (network data)</span><b className="num">{sim.instRate}%</b></div>
+            <div className="row between sm"><span>Success at this merchant today (data)</span><b className="num">{sim.base}%</b></div>
+            <div className="row between"><span>Implied change in successful payments</span><b className="num">{sgn(sim.delta)}{Math.abs(sim.delta).toFixed(1)}</b></div>
+            <div className="row between"><span>Implied change in value at average ticket</span><b className="num">{sgn(sim.value)}{money(Math.abs(sim.value))}</b></div></div>
+          <span className="mute sm">Change = (success on this instrument − success today) × payments shifted. These customers would have paid another way and often succeeded, so the change can be near zero or negative. Reach, affordability and basket size are what a pilot would test. Only a pilot can show a real effect.</span></div>
       </section>
     </>
   );

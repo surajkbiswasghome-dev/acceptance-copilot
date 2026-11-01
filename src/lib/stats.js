@@ -69,7 +69,7 @@ export function findings() {
   const aIdx = ACQ.indexOf(acq.acquirer);
   const rows = TX.filter(t => t.acq === aIdx && isRupay(t.inst));
   const lostRows = Math.round(rows.length * Math.abs(acq.gap) / 100);
-  items.push({ id: 'f1', gate: 'Experience', title: acq.acquirer + ' × RuPay', subtitle: acq.success + '% success · n = ' + acq.n + ' · peers ' + acq.peers + '% · gap ' + acq.gap + ' pts', gap: acq.gap, impact: lostRows + ' extra failed payments in 30 days', acq: aIdx });
+  items.push({ id: 'f1', gate: 'Experience', title: acq.acquirer + ' × RuPay', subtitle: 'RuPay debit + credit combined · ' + acq.success + '% success · n = ' + acq.n + ' · peers ' + acq.peers + '% · gap ' + acq.gap + ' pts', gap: acq.gap, impact: lostRows + ' extra failed payments in 30 days', acq: aIdx });
   const iss = issuerSplit().sort((a, b) => b.issuerDeclineRate - a.issuerDeclineRate)[0];
   items.push({ id: 'f2', gate: 'Experience', title: iss.issuer + ' issuer declines', subtitle: iss.issuerDeclineRate + '% of its payments declined by the issuer · n = ' + iss.n, gap: null, impact: iss.declines + ' declines in 30 days', iss: ISS.indexOf(iss.issuer) });
   const cu = shareByCategory(5);
@@ -110,4 +110,15 @@ export function recommend(mi) {
 export function pilotCohort(limit = 8) {
   return MERCH.filter(m => !m.enabled[5] && ['Electronics', 'Travel', 'Education', 'Healthcare', 'Home improvement'].includes(m.category)).slice(0, limit)
     .concat(MERCH.filter(m => m.enabled[5] && ['Electronics', 'Travel'].includes(m.category))).slice(0, limit);
+}
+
+// Simulation: customers who move to this instrument would otherwise have paid another way and often succeeded.
+// So the implied gain is only the DIFFERENCE in success rates times the payments moved. It can be near zero or negative.
+export function simulateShift(mi, shiftPct, inst = 5) {
+  const p = merchantProfile(mi);
+  const instRate = rate(TX.filter(t => t.inst === inst)) ?? 0;
+  const base = p.success ?? 0;
+  const moved = Math.round((p.n * shiftPct) / 100);
+  const delta = Math.round(moved * (instRate - base)) / 100 || 0;
+  return { moved, instRate, base, delta, value: Math.round(delta * p.avgTicket), n: p.n, avgTicket: p.avgTicket };
 }

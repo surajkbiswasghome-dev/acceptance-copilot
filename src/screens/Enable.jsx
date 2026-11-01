@@ -10,9 +10,10 @@ export default function Enable({ role }) {
   const [mi, setMi] = useState(fromHash() ?? withRecs[0]);
   const [checks, setChecks] = useKey('ac_checks', {}); const done = checks[mi] || [];
   const r = S.recommend(mi); const m = r.profile.merchant;
-  const items = r.recs.map(x => x.instrument).join(', ') || 'your current set';
+  const inst = r.recs.filter(x => x.gate === 'Coverage').map(x => x.instrument); const offers = r.recs.filter(x => x.gate !== 'Coverage').map(x => x.instrument);
+  const ask = [inst.length ? 'We would like to enable: ' + inst.join(', ') + '.' : '', offers.length ? 'We would also like to discuss: ' + offers.join(', ').replace(/Offer on /g, 'an offer on ').replace(/No-cost EMI offer/g, 'a no-cost EMI offer') + '.' : ''].filter(Boolean).join(' ') || 'We would like to review your current setup together.';
   const [msg, setMsg] = useState(null);
-  const draft = `Hello ${m.name} team,\n\nOver the last 30 days your checkout handled ${r.profile.n} payments with a ${r.profile.success}% success rate. We would like to enable the following for you: ${items}.\n\nWe suggest a small trial of 8 weeks, with results reviewed together before any wider rollout. Could we set up a 20-minute call this week to confirm the technical steps and checkout wording?\n\nRegards,\n${role.name}`;
+  const draft = `Hello ${m.name} team,\n\nOver the last 30 days your checkout handled ${r.profile.n} payments with a ${r.profile.success}% success rate. ${ask}\n\nWe suggest a small trial of 8 weeks, with results reviewed together before any wider rollout. Could we set up a 20-minute call this week to confirm the technical steps and checkout wording?\n\nRegards,\n${role.name}`;
   const text = msg ?? draft;
   const toggle = i => setChecks(c => { const cur = c[mi] || []; return { ...c, [mi]: cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i] }; });
   return (

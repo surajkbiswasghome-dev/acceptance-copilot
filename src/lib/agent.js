@@ -29,9 +29,9 @@ export function offlineAgent(id) {
   const steps = []; const call = (tool, args, summary) => { const result = runTool(tool, args); steps.push({ tool, args, result: summary(result) }); return result; };
   const F = S.findings().find(f => f.id === id);
   if (id === 'f1') {
-    const cmp = call('compare_acquirers', {}, r => { const w = [...r].sort((a, b) => a.gap - b.gap)[0]; return w.acquirer + ' is ' + Math.abs(w.gap) + ' points below the other acquirers on RuPay (' + w.success + '% vs ' + w.peers + '%).'; });
+    const cmp = call('compare_acquirers', {}, r => { const w = [...r].sort((a, b) => a.gap - b.gap)[0]; return w.acquirer + ' is ' + Math.abs(w.gap) + ' points below the other acquirers on RuPay debit and credit combined (' + w.success + '% vs ' + w.peers + '%).'; });
     const w = [...cmp].sort((a, b) => a.gap - b.gap)[0], ai = S.ACQ.indexOf(w.acquirer);
-    const db = call('decline_breakdown', { acquirer: ai, rupay_only: true }, r => { const t = r[0]; const tot = r.reduce((a, x) => a + x.n, 0); return tot + ' declines: ' + r.slice(0, 3).map(x => x.n + ' ' + x.label.toLowerCase() + ' (' + x.share + '%)').join(', ') + '.'; });
+    const db = call('decline_breakdown', { acquirer: ai, rupay_only: true }, r => { const t = r[0]; const tot = r.reduce((a, x) => a + x.n, 0); return tot + ' declines on RuPay debit + credit combined: ' + r.slice(0, 3).map(x => x.n + ' ' + x.label.toLowerCase() + ' (' + x.share + '%)').join(', ') + '.'; });
     const peerDb = S.declineBreakdown(t => t.acq !== ai && S.isRupay(t.inst)); const peerTimeout = peerDb.find(x => x.code === 'timeout').share;
     const sp = call('issuer_split', { acquirer: ai }, r => { const bad = r.filter(x => x.timeoutRate >= 1.5 && x.n >= 20).length; return 'Timeouts appear at ' + bad + ' of ' + r.length + ' issuers on this route, so the cause sits on the acquirer side, not with one issuer.'; });
     call('check_sample_size', { n: w.n }, r => 'n = ' + r.n + '. ' + r.note);
