@@ -2,7 +2,7 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
 const PORT = Number(process.env.PORT || 4180); const STUB = process.env.STUB !== '0';
 if (STUB) {
-  process.env.SESSION_SECRET = 'test-secret'; process.env.ALLOWED_RECIPIENTS = 'me@test.example,dev@test.example';
+  process.env.SESSION_SECRET = 'test-secret'; process.env.ALLOWED_RECIPIENTS = 'me@test.example,dev@test.example'; process.env.ALLOWED_TELEGRAM_CHATS = '111222333';
   const H = {}; const C = {};
   globalThis.__REDIS_STUB = cmd => { const [op, key, a, b] = cmd; H[key] = H[key] || {};
     if (op === 'HGETALL') return Object.entries(H[key]).flat(); if (op === 'HGET') return H[key][a] ?? null; if (op === 'HSET') { H[key][a] = b; return 1; }

@@ -8,8 +8,15 @@ export async function sendMail({ to, subject, html, text }) {
   const t = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: e.gmailUser, pass: e.gmailPass } });
   try { await t.sendMail({ from: `"Acceptance Copilot (demo)" <${e.gmailUser}>`, to: to.join(','), subject, html, text }); return { ok: true }; } catch (err) { return { ok: false, error: 'Gmail refused: ' + String(err.message || err).slice(0, 140) }; }
 }
-export async function sendTelegram(text) {
-  if (globalThis.__TG_CAPTURE) { globalThis.__TG_CAPTURE.push(text); return { ok: true }; }
-  const e = env(); if (!e.tgToken || !e.tgChat) return { ok: false, error: 'Telegram is not connected (add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Vercel)' };
-  try { const r = await fetch(`https://api.telegram.org/bot${e.tgToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: e.tgChat, text, disable_web_page_preview: true }) }); const j = await r.json(); return j.ok ? { ok: true } : { ok: false, error: 'Telegram: ' + (j.description || r.status) }; } catch (err) { return { ok: false, error: 'Telegram unreachable' }; }
+export const allowedChat = id => { const e = env(); return e.tgAllow.includes(String(id).trim()); };
+export async function sendTelegram(text, chatId, buttons) {
+  if (globalThis.__TG_CAPTURE) { globalThis.__TG_CAPTURE.push(text + (chatId ? ' [to ' + chatId + ']' : '') + (buttons ? ' [buttons ' + buttons.map(b => b[0]).join('|') + ']' : '')); return { ok: true }; }
+  const e = env(); const chat = chatId || e.tgChat;
+  if (!e.tgToken || !chat) return { ok: false, error: 'Telegram is not connected (add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Vercel)' };
+  try {
+    const body = { chat_id: chat, text, disable_web_page_preview: true };
+    if (buttons) body.reply_markup = { inline_keyboard: buttons.map(b => [{ text: b[0], url: b[1] }]) };
+    const r = await fetch(`https://api.telegram.org/bot${e.tgToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({})); return j.ok ? { ok: true } : { ok: false, error: j.description || ('Telegram answered ' + r.status) };
+  } catch (err) { return { ok: false, error: 'Could not reach Telegram' }; }
 }

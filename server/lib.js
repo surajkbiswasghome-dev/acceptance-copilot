@@ -7,7 +7,7 @@ export const env = () => ({
   redisToken: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '',
   gmailUser: process.env.GMAIL_USER || '', gmailPass: process.env.GMAIL_APP_PASSWORD || '',
   allow: (process.env.ALLOWED_RECIPIENTS || process.env.GMAIL_USER || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
-  tgToken: process.env.TELEGRAM_BOT_TOKEN || '', tgChat: process.env.TELEGRAM_CHAT_ID || '',
+  tgToken: process.env.TELEGRAM_BOT_TOKEN || '', tgChat: process.env.TELEGRAM_CHAT_ID || '', tgAllow: (process.env.ALLOWED_TELEGRAM_CHATS || process.env.TELEGRAM_CHAT_ID || '').split(',').map(x => x.trim()).filter(Boolean),
   demoPassword: process.env.DEMO_PASSWORD || 'demo-demo-demo', briefTo: process.env.BRIEF_EMAIL || process.env.GMAIL_USER || ''
 });
 export const status = () => { const e = env(); return { server: !!(e.secret && (e.redisUrl || globalThis.__REDIS_STUB)), storage: !!(e.redisUrl || globalThis.__REDIS_STUB), email: !!(e.gmailUser && e.gmailPass) || !!globalThis.__MAIL_CAPTURE, telegram: !!(e.tgToken && e.tgChat) || !!globalThis.__TG_CAPTURE }; };
