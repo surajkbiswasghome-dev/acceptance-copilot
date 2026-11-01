@@ -28,6 +28,9 @@ export function parse(q) {
 }
 
 export function dataAnswer(q) {
+  const cmp = q.toLowerCase().match(/acq(?:uirer)?\s*([a-d])\b\s*(?:and|vs\.?|versus|&|,|or|with)\s*(?:acq(?:uirer)?\s*)?([a-d])\b/);
+  if (cmp && cmp[1] !== cmp[2]) { const [w0, w1, wl] = WIN(q.toLowerCase()); const ids = [cmp[1], cmp[2]].map(x => 'abcd'.indexOf(x)); const parts = ids.map(i => { const r = S.TX.filter(t => t.acq === i && t.day >= w0 && t.day <= w1); const st = stat(r); return { name: S.ACQ[i], ...st, top: reasons(r).slice(0, 2).map(x => x.label.toLowerCase() + ' ' + x.share + '%').join(', ') }; });
+    const t = `${parts.map(x => `${x.name}: ${x.ok}% success, ${x.lat} ms median latency, cost index ${x.cost}, n = ${x.n}`).join('  |  ')} ${wl}. Main decline reasons: ${parts.map(x => x.name + ' ' + x.top).join('; ')}.`; return { tool: 'data_query', answer: t, evidence: t }; }
   const p = parse(q); const who = p.labels.length ? p.labels.join(' · ') : 'the whole portfolio';
   if (!p.labels.length && !p.dim && !p.metric) return null;
   // Ranking across a dimension: "which acquirer is weakest", "which issuer declines the most".

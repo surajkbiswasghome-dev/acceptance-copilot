@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useKey } from './lib/store.js';
 import { ROLES, roleById } from './lib/roles.js';
 import { audit, conn, resetDemo } from './lib/db.js';
-import { Logo } from './ui.jsx';
+import { Logo, ResetButton, Toasts } from './ui.jsx';
 const Insights = lazy(() => import('./screens/Insights.jsx'));
 import Diagnose from './screens/Diagnose.jsx';
 import Explain from './screens/Explain.jsx';
@@ -12,13 +12,14 @@ import Enable from './screens/Enable.jsx';
 import Tickets from './screens/Tickets.jsx';
 import Pilot from './screens/Pilot.jsx';
 import Brief from './screens/Brief.jsx';
+import Agents from './screens/Agents.jsx';
 import Account from './screens/Account.jsx';
 import Login from './screens/Login.jsx';
 import { Welcome, Chat } from './Assistant.jsx';
 import { DEFAULT_LANG } from './lib/lang.js';
 
-const LABEL = { insights: 'Insights', diagnose: 'Diagnose', explain: 'Explain', recommend: 'Recommend', proposals: 'Proposals', enable: 'Enablement', tickets: 'Tickets', pilot: 'Pilot', brief: 'Brief' };
-const SCREENS = { insights: Insights, diagnose: Diagnose, explain: Explain, recommend: Recommend, proposals: Proposals, enable: Enable, tickets: Tickets, pilot: Pilot, brief: Brief, account: Account };
+const LABEL = { insights: 'Insights', diagnose: 'Diagnose', explain: 'Explain', recommend: 'Recommend', proposals: 'Proposals', enable: 'Enablement', tickets: 'Tickets', pilot: 'Pilot', brief: 'Brief', agents: 'Agents' };
+const SCREENS = { insights: Insights, diagnose: Diagnose, explain: Explain, recommend: Recommend, proposals: Proposals, enable: Enable, tickets: Tickets, pilot: Pilot, brief: Brief, agents: Agents, account: Account };
 const useRoute = () => { const get = () => (location.hash.replace('#/', '') || 'insights').split('?')[0]; const [r, setR] = useState(get); useEffect(() => { const f = () => setR(get()); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []); return r; };
 
 export default function App() {
@@ -45,11 +46,12 @@ export default function App() {
           <span className="pill hide-sm" title="All data in this prototype is synthetic">Synthetic data</span>
           <button className="iconbtn" aria-label="Toggle theme" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="9" cy="9" r="3.4" /><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4" /></svg> : <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M15 10.5A6.5 6.5 0 017.5 3 6.5 6.5 0 109 15.5a6.5 6.5 0 006-5z" /></svg>}</button>
           <button className="avatar" aria-label="Account menu" aria-expanded={open} onClick={() => setOpen(!open)}>{role.short}</button>
-          {open && <div className="menu" role="menu"><span className="who"><b>{role.name}</b><small>{role.email}</small></span><a href="#/account">Account, settings and audit log</a>{role.canApprove && <button onClick={async () => { if (!confirmReset) { setConfirmReset(true); return; } await resetDemo(); setConfirmReset(false); setOpen(false); }}>{confirmReset ? 'Click again to clear all demo data' : 'Reset demo'}</button>}<button onClick={signOut}>Sign out</button></div>}
+          {open && <div className="menu" role="menu"><span className="who"><b>{role.name}</b><small>{role.email}</small></span><a href="#/account">Account, settings and audit log</a>{role.canApprove && <ResetButton bare className="menuitem" onReset={resetDemo} />}<button onClick={signOut}>Sign out</button></div>}
         </div>
       </header>
       <main className="page fade" key={route}><Suspense fallback={<div className="mute">Loading…</div>}><Screen role={role} /></Suspense></main>
       {welcome && <Welcome lang={(() => { try { return localStorage.getItem('ac_lang_' + role.id) || DEFAULT_LANG[role.id] || 'en'; } catch { return 'en'; } })()} name={(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } })()} role={role} onClose={() => { try { sessionStorage.setItem('ac_welcomed', '1'); } catch {} setWelcome(false); }} onAsk={t => { try { sessionStorage.setItem('ac_welcomed', '1'); } catch {} setWelcome(false); setSeed({ text: t, n: Date.now() }); }} />}
+      <Toasts />
       <Chat role={role} open={chatOpen} setOpen={setChatOpen} seed={seed} />
       <nav className="bottom" aria-label="Views" style={{ gridTemplateColumns: `repeat(${bottom.length + (rest.length ? 1 : 0)},1fr)` }}>
         {bottom.map(k => <a key={k} href={'#/' + k} className={route === k ? 'on' : ''}>{LABEL[k]}</a>)}

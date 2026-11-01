@@ -9,7 +9,7 @@ const useCtx = () => ({ decisions: useColl('decisions'), tickets: useColl('ticke
 
 export function Welcome({ name, role, lang, onClose, onAsk }) {
   const ctx = useCtx(); const w = welcomeLines(name, ctx, new Date(), lang); const en = welcomeLines(name, ctx, new Date(), 'en'); const [talking, setTalking] = useState(false); const [note, setNote] = useState('');
-  const say = async () => { setTalking(true); const r = await speak(w.parts, () => setTalking(false), lang === 'en' ? undefined : en.parts); setNote(r === 'fallback' ? 'This device has no ' + LANGS.find(x => x.id === lang).label + ' voice, so the English welcome was read. The text is shown above.' : ''); };
+  const say = async () => { setTalking(true); setNote(''); await speak(w.parts, () => setTalking(false), lang === 'en' ? undefined : en.parts, setNote); };
   useEffect(() => { say(); return () => stopSpeech(); }, []);
   const close = () => { stopSpeech(); onClose(); };
   return (<div className="welcome-bg" role="dialog" aria-label="Welcome" onClick={close}><div className="welcome" onClick={e => e.stopPropagation()}>

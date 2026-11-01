@@ -41,6 +41,8 @@ export function reply(q, ctx, role, scr) {
     const lines = [`${st.undecided.length} finding${st.undecided.length === 1 ? '' : 's'} waiting for a decision${st.top ? ', biggest: ' + st.top.title : ''}.`, `${st.pend.length} routing request${st.pend.length === 1 ? '' : 's'} awaiting approval, ${st.open.length} other ticket${st.open.length === 1 ? '' : 's'} open.`, `${st.sent.length} proposal${st.sent.length === 1 ? '' : 's'} awaiting a merchant reply, ${st.interested.length + st.calls.length} reply to follow up.`];
     return { text: lines.join('\n'), links: [L('Open the brief', 'brief'), L('Review findings', 'diagnose'), L('Tickets', 'tickets')] };
   }
+  if (/ticket/.test(s) && /(how many|number|open|pending|list|which|show|status)/.test(s)) { const t = ctx.tickets || []; if (!t.length) return { text: 'There are no tickets yet. Raise one from an approved finding on Explain.', links: [L('Open Explain', 'explain')] }; const by = {}; t.forEach(x => { by[x.status] = (by[x.status] || 0) + 1; }); return { text: `${t.length} ticket${t.length === 1 ? '' : 's'}: ` + Object.entries(by).map(([k, v]) => v + ' ' + k.toLowerCase()).join(', ') + '.\n' + t.slice(0, 3).map(x => `${x.id} · ${x.kind} · ${x.title}`).join('\n'), links: [L('Open Tickets', 'tickets')] }; }
+  if (/proposal/.test(s) && /(how many|number|open|pending|list|which|show|status)/.test(s)) { const p = ctx.proposals || []; if (!p.length) return { text: 'There are no proposals yet. Create one from Recommend or Proposals.', links: [L('Open Proposals', 'proposals')] }; const by = {}; p.forEach(x => { by[x.status] = (by[x.status] || 0) + 1; }); return { text: `${p.length} proposal${p.length === 1 ? '' : 's'}: ` + Object.entries(by).map(([k, v]) => v + ' ' + k.replace('_', ' ')).join(', ') + '.', links: [L('Open Proposals', 'proposals')] }; }
   if (/(which|what).*(tab|screen|page|visit|start|first)|where.*(start|go)|plan my day/.test(s)) {
     const plan = [['insights', 'Insights', `See what changed this week and where acceptance can grow.`]];
     if (st.undecided.length) plan.push(['diagnose', 'Diagnose', `${st.undecided.length} finding${st.undecided.length === 1 ? '' : 's'} to review. Start with: ${st.top.title}.`]);
@@ -57,12 +59,16 @@ export function reply(q, ctx, role, scr) {
   return { text: 'I could not map that to a figure. Try naming an acquirer, instrument, issuer or merchant, and a period, for example “decline reasons for Acquirer B today” or “which issuer declines the most?”.', fallback: true, chips: true };
 }
 // The full path: rules first for navigation and next steps, computed data next, and the AI model (when connected) to phrase it or to answer what the rules could not map.
+const logMiss = (q, reason, screen) => { try { const k = 'ac_unanswered'; const a = JSON.parse(localStorage.getItem(k) || '[]'); a.unshift({ q, reason, screen, ts: new Date().toISOString() }); localStorage.setItem(k, JSON.stringify(a.slice(0, 30))); } catch (e) {} };
 export async function askCopilot(q, ctx, role) {
-  const scr = screenOf(); const r = reply(q, ctx, role, scr); if (!r.data && !r.fallback) return r;
+  const scr = screenOf(); const r = reply(q, ctx, role, scr);
+  if (r.text === OFF_TOPIC) logMiss(q, 'Declined by the scope guardrail (not about payment acceptance or this platform)', scr.screen);
+  if (!r.data && !r.fallback) return r;
   try {
     const res = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q, screen: scr.screen, findingId: scr.findingId, role: role?.name }), signal: AbortSignal.timeout(28000) });
     const j = res.ok ? await res.json() : null; if (j && j.mode === 'live' && j.answer) return { ...r, text: j.answer, live: true, chips: false };
   } catch (e) { /* offline: show the computed answer */ }
+  if (r.fallback) logMiss(q, 'Could not be mapped to a figure, and the AI model was not available to answer it', scr.screen);
   return r;
 }
 export const SUGGESTIONS = ['Today’s update', 'Which tabs should I visit today?', 'What does Routing do?', 'Which acquirer is weakest?'];

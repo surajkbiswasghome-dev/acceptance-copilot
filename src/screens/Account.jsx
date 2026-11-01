@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useKey } from '../lib/store.js';
 import { useColl, put, audit, resetDemo, conn } from '../lib/db.js';
-import { Head } from '../ui.jsx';
+import { Head, ResetButton } from '../ui.jsx';
 
 export default function Account({ role }) {
   const log = useColl('audit'); const settings = useColl('settings').find(x => x.id === 'main') || { id: 'main', devopsEmail: '', approverEmail: '' };
@@ -23,7 +23,7 @@ export default function Account({ role }) {
       <section className="card"><span className="eyebrow">Notification settings</span>
         <div className="grid2e"><label className="field"><span>DevOps team email (default recipient for tickets)</span><input type="text" disabled={!canSet} value={dv ?? settings.devopsEmail} onChange={e => setDv(e.target.value)} placeholder="devops@yourcompany.com" /></label><label className="field"><span>Routing approver email</span><input type="text" disabled={!canSet} value={ap ?? settings.approverEmail} onChange={e => setAp(e.target.value)} placeholder="head@yourcompany.com" /></label></div>
         <div className="row wrap"><button className="btn pri" disabled={!canSet || (dv == null && ap == null)} onClick={saveSet}>Save</button><span className="mute sm">For safety, real email only goes to addresses on the allowed list set up with the server. Other addresses show as blocked.</span></div></section>
-      <section className="card"><div className="row between wrap"><span className="eyebrow">Audit log</span><div className="row"><div className="seg">{['All', 'Decisions', 'Work', 'Sign-ins'].map(x => <button key={x} className={f === x ? 'on' : ''} onClick={() => setF(x)}>{x}</button>)}</div>{canSet && <button className="btn" style={{ minHeight: 34, fontSize: 13 }} onClick={() => resetDemo()}>Reset demo</button>}</div></div>
+      <section className="card"><div className="row between wrap"><span className="eyebrow">Audit log</span><div className="row"><div className="seg">{['All', 'Decisions', 'Work', 'Sign-ins'].map(x => <button key={x} className={f === x ? 'on' : ''} onClick={() => setF(x)}>{x}</button>)}</div>{canSet && <ResetButton style={{ minHeight: 34, fontSize: 13 }} onReset={resetDemo} />}</div></div>
         {shown.length === 0 ? <p className="mute">No entries yet.</p> : <table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Item</th></tr></thead><tbody>{shown.slice(0, 120).map(e => <tr key={e.id}><td className="num">{new Date(e.ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td><td>{e.who}</td><td><b>{e.action}</b></td><td className="mute">{e.target}{e.detail ? ' · ' + e.detail : ''}</td></tr>)}</tbody></table>}</section>
     </>
   );

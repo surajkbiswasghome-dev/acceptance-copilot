@@ -11,7 +11,7 @@ const lkey = n => 'ac_c_' + n;
 const readLocal = n => { try { return Object.values(JSON.parse(ls.get(lkey(n)) || '{}')); } catch { return []; } };
 const writeLocal = (n, arr) => ls.set(lkey(n), JSON.stringify(Object.fromEntries(arr.map(x => [x.id, x]))));
 const headers = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + token });
-async function server(path, opts) { const r = await fetch(path, { ...opts, headers: headers() }); if (r.status === 401) { window.dispatchEvent(new Event('ac-unauth')); throw new Error('unauthorised'); } if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+async function server(path, opts) { const r = await fetch(path, { ...opts, headers: headers() }); if (r.status === 401) { window.dispatchEvent(new Event('ac-unauth')); throw new Error('unauthorised'); } if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch (e) {} throw new Error(m || 'HTTP ' + r.status); } return r.json(); }
 export async function load(n) {
   if (pending) return;
   try { state[n] = mode === 'server' ? (await server('/api/db?c=' + n)).items : readLocal(n); } catch { state[n] = state[n] || readLocal(n); }

@@ -52,3 +52,17 @@ export function MerchantPicker({ merchants, value, onChange, allLabel = 'Whole p
     <input type="text" value={q} placeholder={cur ? '' : 'Type a merchant name'} aria-label="Find a merchant" onFocus={() => setOpen(true)} onChange={e => { setQ(e.target.value); setOpen(true); }} onBlur={() => setTimeout(() => setOpen(false), 150)} onKeyDown={e => { if (e.key === 'Enter' && list[0]) { e.preventDefault(); pick(list[0].i); } if (e.key === 'Escape') { setQ(''); setOpen(false); } }} /></div>
     {open && <div className="mlist" role="listbox"><button type="button" onMouseDown={e => e.preventDefault()} onClick={() => pick('')}><b>{allLabel}</b></button>{list.map(({ m, i }) => <button type="button" key={i} onMouseDown={e => e.preventDefault()} onClick={() => pick(i)}><b>{m.name}</b><small>{m.category}</small></button>)}{list.length === 0 && <span className="mute sm" style={{ padding: 10 }}>No merchant matches “{q}”.</span>}</div>}</div>);
 }
+
+// Reset with clear feedback: asks to confirm, disables while working, then confirms, and raises a toast.
+export function ResetButton({ onReset, className = 'btn', style, bare }) {
+  const [st, setSt] = React.useState('idle');
+  React.useEffect(() => { if (st !== 'confirm') return; const t = setTimeout(() => setSt('idle'), 5000); return () => clearTimeout(t); }, [st]);
+  const click = async e => { e.stopPropagation(); if (st === 'busy' || st === 'done') return; if (st === 'idle') { setSt('confirm'); return; } setSt('busy'); try { await onReset(); setSt('done'); window.dispatchEvent(new CustomEvent('ac-toast', { detail: 'Demo data cleared. Tickets, proposals, decisions, pilot data and the audit log are empty.' })); } catch (err) { setSt('idle'); window.dispatchEvent(new CustomEvent('ac-toast', { detail: 'Reset failed: ' + (err.message || err) })); return; } setTimeout(() => setSt('idle'), 3000); };
+  const label = { idle: 'Reset demo', confirm: 'Click again to clear all demo data', busy: 'Clearing…', done: '✓ Demo data cleared' }[st];
+  return <button className={className} style={{ ...style, ...(st === 'confirm' ? { borderColor: 'var(--bad)', color: 'var(--bad)' } : {}), ...(st === 'done' ? { borderColor: 'var(--ok)', color: 'var(--ok)' } : {}) }} disabled={st === 'busy'} aria-live="polite" onClick={click}>{st === 'busy' && <span className="spin" aria-hidden="true" />}{label}</button>;
+}
+export function Toasts() {
+  const [t, setT] = React.useState(null);
+  React.useEffect(() => { let h; const f = e => { setT(e.detail); clearTimeout(h); h = setTimeout(() => setT(null), 4500); }; addEventListener('ac-toast', f); return () => { removeEventListener('ac-toast', f); clearTimeout(h); }; }, []);
+  return t ? <div className="toast" role="status">{t}</div> : null;
+}

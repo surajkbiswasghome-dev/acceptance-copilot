@@ -2,6 +2,7 @@
 // All evidence is computed by the tools in code first; Gemini only writes the explanation from that evidence.
 import { offlineAgent, offlineAnswer } from '../src/lib/agent.js';
 import * as S from '../src/lib/stats.js';
+import { rateLimit, status } from '../server/lib.js';
 import { dataAnswer, snapshot } from '../src/lib/qa.js';
 import { inScope, OFF_TOPIC } from '../src/lib/guard.js';
 import { HELP } from '../src/lib/help.js';
@@ -51,6 +52,7 @@ export default async function handler(req, res) {
   if (!key) return fallback('GEMINI_API_KEY is not set on the server (add it in Vercel and redeploy)');
   try {
     if (body.question) {
+      if (status().server && !(await rateLimit('agent', 60, 3600))) return res.status(429).json({ error: 'Too many questions this hour' });
       const q = String(body.question).slice(0, 400); const scr = { screen: body.screen, findingId: body.findingId };
       if (!inScope(q, scr)) return res.status(200).json({ tool: 'guardrail', answer: OFF_TOPIC, mode: 'guardrail' });
       const d = dataAnswer(q); const evidence = d ? d.evidence || d.answer : 'No figure could be computed directly from the question.';
