@@ -50,7 +50,7 @@ export default function App() {
         </div>
       </header>
       <main className="page fade" key={route}><Suspense fallback={<div className="mute">Loading…</div>}><Screen role={role} /></Suspense></main>
-      {welcome && <Welcome lang={(() => { try { return localStorage.getItem('ac_lang_' + role.id) || DEFAULT_LANG[role.id] || 'en'; } catch { return 'en'; } })()} name={(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } })()} role={role} onClose={() => { try { sessionStorage.setItem('ac_welcomed', '1'); } catch {} setWelcome(false); }} onAsk={t => { try { sessionStorage.setItem('ac_welcomed', '1'); } catch {} setWelcome(false); setSeed({ text: t, n: Date.now() }); }} />}
+      {welcome && <Welcome lang={(() => { try { return sessionStorage.getItem('ac_welcome_lang') || localStorage.getItem('ac_lang_' + role.id) || DEFAULT_LANG[role.id] || 'en'; } catch { return 'en'; } })()} name={(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } })()} role={role} onClose={() => { try { sessionStorage.setItem('ac_welcomed', '1'); } catch {} setWelcome(false); }} onAsk={t => { try { sessionStorage.setItem('ac_welcomed', '1'); } catch {} setWelcome(false); setSeed({ text: t, n: Date.now() }); }} />}
       <Toasts />
       <Chat role={role} open={chatOpen} setOpen={setChatOpen} seed={seed} />
       <nav className="bottom" aria-label="Views" style={{ gridTemplateColumns: `repeat(${bottom.length + (rest.length ? 1 : 0)},1fr)` }}>

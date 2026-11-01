@@ -19,29 +19,36 @@ async function pick(lang) {
 const sentences = t => t.split(/(?<=[.!?।])\s+/).map(x => x.trim()).filter(Boolean);
 export async function canSpeak(lang) { return !!(await pick(lang)); }
 export const voiceInfo = { via: '', name: '', reason: '' };
-// Order: Gemini speech from the server (a female voice, most natural, takes a few seconds), then a female voice on this device. Never a male or unknown default.
-export async function speak(parts, onend, fallbackParts, onStatus) {
-  stopSpeech(); voiceInfo.via = ''; voiceInfo.name = ''; voiceInfo.reason = '';
-  const say = m => onStatus && onStatus(m);
-  if (conn.mode() === 'server') {
-    say('Preparing the voice…'); const g = await speakGemini(parts.map(p => p.text).join(' '), onend);
-    if (g === true) { voiceInfo.via = 'gemini'; voiceInfo.name = 'Gemini, female voice'; say('Voice: Gemini (female)'); return 'gemini'; }
-    voiceInfo.reason = 'Server voice unavailable (' + g + ')';
-  }
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) { voiceInfo.reason += ' No speech support in this browser.'; say(voiceInfo.reason); onend && onend(); return 'none'; }
-  let use = parts; const picks = await Promise.all(use.map(p => pick(p.lang || 'en-IN')));
-  if (picks.some(v => !v) && fallbackParts) { use = fallbackParts; picks.length = 0; for (const p of use) picks.push(await pick(p.lang || 'en-IN')); }
-  if (picks.some(v => !v)) { voiceInfo.reason = 'No female voice found on this device, so nothing was spoken. The text is shown. ' + voiceInfo.reason; say(voiceInfo.reason); onend && onend(); return 'none'; }
-  const queue = []; use.forEach((p, i) => sentences(p.text).forEach(t => queue.push({ t, lang: p.lang || 'en-IN', v: picks[i] })));
-  voiceInfo.via = 'browser'; voiceInfo.name = picks[0].name; say('Voice: ' + picks[0].name + (use === fallbackParts ? ' (English, no ' + parts[0].lang + ' voice on this device)' : ''));
-  let i = 0; const next = () => { if (i >= queue.length) { onend && onend(); return; } const q = queue[i++]; const u = new SpeechSynthesisUtterance(q.t); u.lang = q.lang; u.voice = q.v; u.rate = 0.95; u.pitch = 1.0; u.onend = next; u.onerror = next; speechSynthesis.speak(u); };
-  next(); return use === fallbackParts ? 'fallback' : 'browser';
-}
-// Gemini speech through the server. Returns true when it plays, otherwise the reason.
-export async function speakGemini(text, onend) {
+const hash = t => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + t.length; };
+const mem = new Map();
+// Audio is kept on this device once made, so repeat sign-ins start instantly and use no server calls.
+async function cached(key) { if (mem.has(key)) return mem.get(key); try { const c = await caches.open('ac-tts-v1'); const r = await c.match('/__tts/' + key); if (r) { const u = URL.createObjectURL(await r.blob()); mem.set(key, u); return u; } } catch (e) {} return null; }
+async function store(key, wavB64) { const bin = atob(wavB64); const arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); const blob = new Blob([arr], { type: 'audio/wav' }); const u = URL.createObjectURL(blob); mem.set(key, u); try { const c = await caches.open('ac-tts-v1'); await c.put('/__tts/' + key, new Response(blob)); } catch (e) {} return u; }
+// Makes (or finds) Gemini speech for a text. Returns { url } or { reason }.
+export async function prepareVoice(text, lang = 'en-IN', timeoutMs = 20000) {
+  const key = lang + '-' + hash(text); const hit = await cached(key); if (hit) return { url: hit, cached: true };
+  if (conn.mode() !== 'server') return { reason: 'the server voice is not connected' };
   try {
-    const r = await Promise.race([callApi('/api/speak', { text: text.slice(0, 700) }), new Promise((_, rej) => setTimeout(() => rej(new Error('took longer than 20 seconds')), 20000))]);
-    if (r && r.wav) { audio = new Audio('data:audio/wav;base64,' + r.wav); audio.onended = () => onend && onend(); await audio.play(); return true; }
-    return (r && r.error) || 'no audio returned';
-  } catch (e) { return String(e.message || e).slice(0, 120); }
+    const r = await Promise.race([callApi('/api/speak', { text: text.slice(0, 900), lang }), new Promise((_, rej) => setTimeout(() => rej(new Error('took longer than ' + Math.round(timeoutMs / 1000) + ' seconds')), timeoutMs))]);
+    if (r && r.wav) return { url: await store(key, r.wav) }; return { reason: (r && r.error) || 'no audio returned' };
+  } catch (e) { return { reason: String(e.message || e).slice(0, 140) }; }
+}
+// Order: Gemini female voice (most natural), then a female voice on this device in the SAME language. It never switches language and never uses a male or unknown default.
+export async function speak(parts, onend, _unused, onStatus) {
+  stopSpeech(); voiceInfo.via = ''; voiceInfo.name = ''; voiceInfo.reason = '';
+  const say = m => onStatus && onStatus(m); const lang = parts[0].lang || 'en-IN';
+  say('Preparing the voice…');
+  const chunks = []; { let cur = ''; for (const sn of sentences(parts.map(p => p.text).join(' '))) { if ((cur + ' ' + sn).length > 800 && cur) { chunks.push(cur); cur = sn; } else cur = (cur ? cur + ' ' : '') + sn; } if (cur) chunks.push(cur); }
+  const gs = await Promise.all(chunks.map(c => prepareVoice(c, lang))); const bad = gs.find(x => !x.url);
+  if (!bad) {
+    let k = 0; const play = async () => { if (k >= gs.length) { onend && onend(); return; } audio = new Audio(gs[k++].url); audio.onended = play; await audio.play(); };
+    try { await play(); voiceInfo.via = 'gemini'; say('Voice: Gemini (female)' + (gs.every(x => x.cached) ? ', ready from this device' : '')); return 'gemini'; } catch (e) { voiceInfo.reason = 'the browser blocked autoplay. Press Play voice again'; stopSpeech(); }
+  } else voiceInfo.reason = 'Gemini voice unavailable: ' + bad.reason;
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) { say(voiceInfo.reason); onend && onend(); return 'none'; }
+  const picks = await Promise.all(parts.map(p => pick(p.lang || 'en-IN')));
+  if (picks.some(v => !v)) { say(voiceInfo.reason + '. This device has no female voice for the selected language, so it stays silent rather than switch language. The text is shown above.'); onend && onend(); return 'none'; }
+  const queue = []; parts.forEach((p, i) => sentences(p.text).forEach(t => queue.push({ t, lang: p.lang || 'en-IN', v: picks[i] })));
+  voiceInfo.via = 'browser'; voiceInfo.name = picks[0].name; say((voiceInfo.reason ? voiceInfo.reason + '. ' : '') + 'Voice: ' + picks[0].name + ' (this device)');
+  let i = 0; const next = () => { if (i >= queue.length) { onend && onend(); return; } const q = queue[i++]; const u = new SpeechSynthesisUtterance(q.t); u.lang = q.lang; u.voice = q.v; u.rate = 0.95; u.pitch = 1.0; u.onend = next; u.onerror = next; speechSynthesis.speak(u); };
+  next(); return 'browser';
 }

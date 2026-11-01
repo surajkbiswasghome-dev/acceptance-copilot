@@ -1,22 +1,25 @@
 {
- "functions": {
-  "api/agent.js": {
-   "maxDuration": 60
+  "functions": {
+    "api/agent.js": {
+      "maxDuration": 60
+    },
+    "api/speak.js": {
+      "maxDuration": 30
+    },
+    "api/call.js": {
+      "maxDuration": 30
+    },
+    "api/send.js": {
+      "maxDuration": 30
+    },
+    "api/news.js": {
+      "maxDuration": 15
+    }
   },
-  "api/speak.js": {
-   "maxDuration": 30
-  },
-  "api/call.js": {
-   "maxDuration": 30
-  },
-  "api/send.js": {
-   "maxDuration": 30
-  }
- },
- "crons": [
-  {
-   "path": "/api/brief",
-   "schedule": "30 2 * * *"
-  }
- ]
+  "crons": [
+    {
+      "path": "/api/brief",
+      "schedule": "30 2 * * *"
+    }
+  ]
 }

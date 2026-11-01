@@ -9,7 +9,7 @@ const useCtx = () => ({ decisions: useColl('decisions'), tickets: useColl('ticke
 
 export function Welcome({ name, role, lang, onClose, onAsk }) {
   const ctx = useCtx(); const w = welcomeLines(name, ctx, new Date(), lang); const en = welcomeLines(name, ctx, new Date(), 'en'); const [talking, setTalking] = useState(false); const [note, setNote] = useState('');
-  const say = async () => { setTalking(true); setNote(''); await speak(w.parts, () => setTalking(false), lang === 'en' ? undefined : en.parts, setNote); };
+  const say = async () => { setTalking(true); setNote(''); await speak(w.parts, () => setTalking(false), null, setNote); };
   useEffect(() => { say(); return () => stopSpeech(); }, []);
   const close = () => { stopSpeech(); onClose(); };
   return (<div className="welcome-bg" role="dialog" aria-label="Welcome" onClick={close}><div className="welcome" onClick={e => e.stopPropagation()}>

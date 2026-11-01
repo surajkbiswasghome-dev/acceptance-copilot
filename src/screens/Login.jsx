@@ -1,34 +1,41 @@
 import React, { useState } from 'react';
 import { ROLES } from '../lib/roles.js';
-import { conn } from '../lib/db.js';
 import { Logo } from '../ui.jsx';
+import { Flow, Facts, News, SigningIn } from '../LoginStage.jsx';
+import { prepareVoice } from '../lib/speech.js';
+import { conn, load, getAll } from '../lib/db.js';
 import { LANGS, DEFAULT_LANG } from '../lib/lang.js';
-import { matrix, statusOf } from '../lib/stats.js';
 import { useKey } from '../lib/store.js';
 export default function Login({ onLogin, theme, setTheme }) {
-  const [i, setI] = useState(0); const r = ROLES[i]; const [pw, setPw] = useState('demo-demo-demo'); const [nm, setNm] = useState(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } }); const [lang, setLang] = useState({}); const L = lang[r.id] || (() => { try { return localStorage.getItem('ac_lang_' + r.id); } catch { return null; } })() || DEFAULT_LANG[r.id] || 'en'; const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const [i, setI] = useState(0); const r = ROLES[i]; const [pw, setPw] = useState('demo-demo-demo'); const [nm, setNm] = useState(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } }); const [lang, setLang] = useState({}); const L = lang[r.id] || (() => { try { return localStorage.getItem('ac_lang_' + r.id); } catch { return null; } })() || DEFAULT_LANG[r.id] || 'en'; const [steps, setSteps] = useState(null); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const [, setStatus] = useKey('ac_status', null);
-  const cells = matrix().flat().slice(0, 21);
-  const go = async () => {
-    setBusy(true); setErr('');
+    const go = async () => {
+    setBusy(true); setErr(''); const S3 = (a, b, c) => setSteps([['Signing you in', a], ['Loading your workspace', b], ['Preparing your welcome voice', c]]); S3('run', 'todo', 'todo');
     try {
       const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: r.email, password: pw }) });
-      if (res.status === 401) { setErr('Wrong password for this workspace.'); setBusy(false); return; }
+      if (res.status === 401) { setErr('Wrong password for this workspace.'); setBusy(false); setSteps(null); return; }
       const j = res.ok ? await res.json() : { mode: 'local' };
       if (j.mode === 'server') conn.setServer(j.token); else conn.setLocal();
       setStatus(j.status || null);
     } catch { conn.setLocal(); setStatus(null); }
-    try { localStorage.setItem('ac_name', nm.trim() || 'Suraj'); localStorage.setItem('ac_lang_' + r.id, L); } catch {} setBusy(false); onLogin(r);
+    try { localStorage.setItem('ac_name', nm.trim() || 'Suraj'); localStorage.setItem('ac_lang_' + r.id, L); sessionStorage.setItem('ac_welcome_lang', L); } catch {}
+    S3('done', 'run', 'todo'); try { await Promise.all(['decisions', 'tickets', 'proposals'].map(load)); } catch {}
+    // Make the welcome voice now, while the infographics play, so it is ready the moment the workspace opens.
+    S3('done', 'done', 'run');
+    try { const [{ welcomeLines }, { LANGS: LG }] = await Promise.all([import('../lib/assistant.js'), import('../lib/lang.js')]); const w = welcomeLines(nm.trim() || 'Suraj', { decisions: getAll('decisions'), tickets: getAll('tickets'), proposals: getAll('proposals') }, new Date(), L); await prepareVoice(w.parts.map(p => p.text).join(' '), LG.find(x => x.id === L).tag, 14000); } catch {}
+    S3('done', 'done', 'done'); await new Promise(x => setTimeout(x, 350)); setBusy(false); setSteps(null); onLogin(r);
   };
   return (
     <div className="login">
+      {steps && <SigningIn steps={steps} />}
       <div className="l">
         <div className="row"><Logo size={32} /><b style={{ fontSize: 17 }}>Acceptance Copilot</b></div>
         <div className="col" style={{ gap: 18 }}>
           <h1>See where acceptance leaks.</h1>
           <p className="mute" style={{ maxWidth: '46ch', fontSize: 17 }}>It turns acceptance data into a prioritised, approvable action plan, and a small pilot tests whether it works.</p>
-          <div className="tiles" aria-hidden="true">{cells.map((c, k) => { const s = statusOf(c.rate); return <i key={k} style={{ background: `color-mix(in srgb, var(--${s}) ${s === 'ok' ? 16 : 30}%, var(--s1))`, borderColor: `color-mix(in srgb, var(--${s}) 38%, var(--line))` }} />; })}</div>
+          <Flow /><Facts />
         </div>
+        <News compact />
         <ul className="mute sm" style={{ margin: 0, paddingLeft: 18 }}><li>Numbers are computed in code. The AI explains and recommends.</li><li>A person approves every action, and it is logged.</li><li>Synthetic data only. No real payments or accounts.</li></ul>
       </div>
       <div className="r">
