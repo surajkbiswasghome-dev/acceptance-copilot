@@ -21,7 +21,7 @@ export function parse(q) {
   for (const [re, ids, name] of INSTR) if (re.test(s)) { out.rows = out.rows.filter(t => ids.includes(t.inst)); out.labels.push(name); out.inst = ids; break; }
   const m = S.MERCH.findIndex(x => s.includes(x.name.toLowerCase())); if (m >= 0) { out.rows = out.rows.filter(t => t.m === m); out.labels.push(S.MERCH[m].name); out.merchant = m; }
   const cat = [...new Set(S.MERCH.map(x => x.category))].find(c => s.includes(c.toLowerCase())); if (cat && m < 0) { out.rows = out.rows.filter(t => t.cat === cat); out.labels.push(cat + ' merchants'); out.cat = cat; }
-  out.metric = /decline|reason|why.*(fail|declin)|failure|failed|fail\b|cause/.test(s) && !/success rate|success%/.test(s) ? 'reasons' : /latenc|slow|speed|how fast|response time/.test(s) ? 'latency' : /\bcost|cheap|expens/.test(s) ? 'cost' : /volume|how many|count|number of|transactions|payments (did|were)|gmv|value|amount|sales/.test(s) ? 'volume' : /success|approve|accept|rate|perform|doing|how is|how are|status/.test(s) ? 'success' : null;
+  out.fault = /fault|due to|because of|caused by/.test(s); out.metric = /suffer|faced|face\b|affected|impact|hurt|\blost|loss|worst hit|hardest/.test(s) ? 'impact' : /decline|reason|why.*(fail|declin)|failure|failed|fail\b|cause/.test(s) && !/success rate|success%/.test(s) ? 'reasons' : /latenc|slow|speed|how fast|response time/.test(s) ? 'latency' : /\bcost|cheap|expens/.test(s) ? 'cost' : /volume|how many|count|number of|transactions|payments (did|were)|gmv|value|amount|sales/.test(s) ? 'volume' : /success|approve|accept|rate|perform|doing|how is|how are|status/.test(s) ? 'success' : null;
   out.dim = (DIMS.find(([k, re]) => re.test(s) && !(out[k === 'acquirer' ? 'acq' : k === 'issuer' ? 'iss' : k === 'merchant' ? 'merchant' : k === 'category' ? 'cat' : '_'] != null)) || [])[0];
   out.sup = /(weak|worst|lowest|poor|bad|least|most (declin|fail)|highest (declin|fail)|(declin|fail)\w* (the )?most|struggl|problem)/.test(s) ? 'low' : /(best|strong|highest|top|most|better)/.test(s) ? 'high' : null;
   return out;
@@ -35,7 +35,14 @@ export function dataAnswer(q) {
   if (!p.labels.length && !p.dim && !p.metric) return null;
   // Ranking across a dimension: "which acquirer is weakest", "which issuer declines the most".
   if (p.dim && !(p.metric === 'reasons' && p.labels.length && !p.sup)) {
-    const d = DIMS.find(x => x[0] === p.dim); const rows = p.rows; const groups = d[3].map((name, i) => { const key = p.dim === 'category' ? name : i; const r = rows.filter(t => d[2](t) === key); return { name, ...stat(r), fails: r.filter(t => !t.ok).length, declRate: r.length ? r1(100 * r.filter(t => !t.ok).length / r.length) : null }; }).filter(g => g.n >= (p.dim === 'merchant' ? 10 : 20));
+    const d = DIMS.find(x => x[0] === p.dim); const rows = p.rows;
+    if (p.metric === 'impact') {
+      const fr = rows.filter(t => !t.ok && (!p.fault || t.st === 1)); const gs = d[3].map((name, i) => { const key = p.dim === 'category' ? name : i; const all = rows.filter(t => d[2](t) === key); const f = fr.filter(t => d[2](t) === key); return { name, n: all.length, fails: f.length, pct: all.length ? r1(100 * f.length / all.length) : 0, lost: f.reduce((a, t) => a + t.amt, 0) }; }).filter(g => g.fails > 0).sort((a, b) => b.fails - a.fails);
+      if (!gs.length) return { tool: 'data_query', answer: `No ${p.fault ? 'timeout ' : ''}failures for ${who} ${p.win}.` };
+      const what = p.fault ? 'timeouts (the failure reason that sits on the acquirer side)' : 'failed payments';
+      const t = `${p.dim === 'merchant' ? 'Merchants' : p.dim[0].toUpperCase() + p.dim.slice(1) + 's'} most affected by ${what} for ${who} ${p.win}: ` + gs.slice(0, 5).map(g => `${g.name}: ${g.fails} failed (${g.pct}% of its ${g.n} payments, ${lakh(g.lost)} not completed)`).join('; ') + '.' + (p.fault ? ' Other decline reasons, such as issuer declines, are not counted as acquirer fault.' : '');
+      return { tool: 'data_query', answer: t, evidence: t };
+    } const groups = d[3].map((name, i) => { const key = p.dim === 'category' ? name : i; const r = rows.filter(t => d[2](t) === key); return { name, ...stat(r), fails: r.filter(t => !t.ok).length, declRate: r.length ? r1(100 * r.filter(t => !t.ok).length / r.length) : null }; }).filter(g => g.n >= (WIN(q.toLowerCase())[0] === WIN(q.toLowerCase())[1] ? 8 : p.dim === 'merchant' ? 10 : 20));
     if (groups.length) {
       const m = p.metric === 'latency' ? 'lat' : p.metric === 'cost' ? 'cost' : p.metric === 'volume' ? 'n' : p.metric === 'reasons' ? 'declRate' : 'ok';
       const higherBad = ['lat', 'cost', 'declRate'].includes(m); const asc = p.sup ? (p.sup === 'low') !== higherBad : false;
