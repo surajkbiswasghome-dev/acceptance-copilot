@@ -1,32 +1,32 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as S from '../lib/stats.js';
-import { useKey, audit } from '../lib/store.js';
+import { useColl, put, audit } from '../lib/db.js';
 import { Head, Bar } from '../ui.jsx';
 
-const STEPS = ['Confirm the acquirer supports the instrument on this merchant’s route', 'Check issuer and BIN coverage for the instrument', 'Enable the instrument in the gateway configuration', 'Run a test transaction in the sandbox', 'Approve checkout prompt and offer wording', 'Go live for the merchant and watch results for 7 days'];
-const fromHash = () => { const x = location.hash.split('?m=')[1]; return x ? +x : null; };
+export const STEPS = [['Acquirer confirms the instrument is supported on this merchant’s route', 'Acquirer'], ['Issuer and BIN coverage checked', 'Enablement'], ['Instrument enabled in the gateway configuration', 'DevOps'], ['Sandbox test transaction passed', 'DevOps'], ['Checkout prompt and offer wording approved', 'Enablement'], ['Go live, then watch results for 7 days', 'Enablement']];
+const fromHash = () => (location.hash.split('?id=')[1] || '').split('&')[0] || null;
 export default function Enable({ role }) {
-  const withRecs = useMemo(() => S.MERCH.map((m, i) => i).filter(i => S.recommend(i).recs.length), []);
-  const [mi, setMi] = useState(fromHash() ?? withRecs[0]);
-  const [checks, setChecks] = useKey('ac_checks', {}); const done = checks[mi] || [];
-  const r = S.recommend(mi); const m = r.profile.merchant;
-  const inst = r.recs.filter(x => x.gate === 'Coverage').map(x => x.instrument); const offers = r.recs.filter(x => x.gate !== 'Coverage').map(x => x.instrument);
-  const ask = [inst.length ? 'We would like to enable: ' + inst.join(', ') + '.' : '', offers.length ? 'We would also like to discuss: ' + offers.join(', ').replace(/Offer on /g, 'an offer on ').replace(/No-cost EMI offer/g, 'a no-cost EMI offer') + '.' : ''].filter(Boolean).join(' ') || 'We would like to review your current setup together.';
-  const [msg, setMsg] = useState(null);
-  const draft = `Hello ${m.name} team,\n\nOver the last 30 days your checkout handled ${r.profile.n} payments with a ${r.profile.success}% success rate. ${ask}\n\nWe suggest a small trial of 8 weeks, with results reviewed together before any wider rollout. Could we set up a 20-minute call this week to confirm the technical steps and checkout wording?\n\nRegards,\n${role.name}`;
-  const text = msg ?? draft;
-  const toggle = i => setChecks(c => { const cur = c[mi] || []; return { ...c, [mi]: cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i] }; });
+  const props = useColl('proposals'); const checks = useColl('checks');
+  const queue = props.filter(p => ['interested', 'live'].includes(p.status)); const waiting = props.filter(p => p.status === 'sent').length; const calls = props.filter(p => p.status === 'wants_call');
+  const [sel, setSel] = useState(fromHash());
+  useEffect(() => { const f = () => setSel(fromHash()); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
+  const p = queue.find(x => x.id === sel) || queue[0]; const done = (p && checks.find(c => c.id === p.id)?.done) || [];
+  const canEdit = ['pm', 'head', 'en'].includes(role.id);
+  const toggle = async i => { const next = done.includes(i) ? done.filter(x => x !== i) : [...done, i]; await put('checks', { id: p.id, done: next }); await audit(role.name, (done.includes(i) ? 'Unchecked' : 'Checked') + ' step', S.MERCH[p.merchantId].name, STEPS[i][0]); };
+  const live = async () => { const now = new Date().toISOString(); await put('proposals', { ...p, status: 'live', events: [...p.events, { ts: now, who: role.name, text: 'Marked live after enablement' }] }); await audit(role.name, 'Marked live', S.MERCH[p.merchantId].name, p.id); };
   return (
     <>
-      <Head title="Enable" sub="A checklist and a drafted message for the merchant. Nothing is sent from here." />
-      <select style={{ maxWidth: 420 }} value={mi} onChange={e => { setMi(+e.target.value); setMsg(null); }} aria-label="Merchant">{withRecs.map(i => <option key={i} value={i}>{S.MERCH[i].name} · {S.MERCH[i].category}</option>)}</select>
-      <div className="grid2e" style={{ alignItems: 'start' }}>
-        <section className="card"><div className="row between"><span className="eyebrow">Checklist</span><b className="num sm">{done.length}/{STEPS.length}</b></div><Bar v={done.length} max={STEPS.length} />
-          <div>{STEPS.map((s, i) => <label key={i} className="check"><input type="checkbox" checked={done.includes(i)} onChange={() => { toggle(i); audit(role.name, done.includes(i) ? 'Unchecked' : 'Checked', m.name, s); }} /><span>{s}</span></label>)}</div></section>
-        <section className="card"><span className="eyebrow">Drafted message</span><textarea value={text} onChange={e => setMsg(e.target.value)} aria-label="Drafted message" />
-          <div className="row wrap"><button className="btn pri" onClick={() => { navigator.clipboard?.writeText(text); audit(role.name, 'Copied draft', m.name); }}>Copy message</button><button className="btn" onClick={() => audit(role.name, 'Marked as sent', m.name, 'Message sent outside this tool')}>Mark as sent</button></div>
-          <span className="mute sm">You review and send it yourself. “Mark as sent” only writes to the audit log.</span></section>
-      </div>
+      <Head title="Enablement" sub="Only merchants who said yes appear here. The checklist starts after their reply, never before." />
+      <div className="chiprow"><span className="pill warn">Awaiting merchant reply: {waiting}</span><span className="pill">Asked for a call: {calls.length}</span><span className="pill ok">In enablement: {queue.filter(x => x.status === 'interested').length}</span><span className="pill ok">Live: {queue.filter(x => x.status === 'live').length}</span></div>
+      {calls.length > 0 && <section className="card"><span className="eyebrow">Asked for a call</span>{calls.map(c => <a key={c.id} className="row between wrap sm" href={'#/proposals?id=' + c.id}><span><b>{S.MERCH[c.merchantId].name}</b> · {c.instruments.map(i => S.INST[i]).join(', ')}</span><span className="pill warn">Call them</span></a>)}</section>}
+      {queue.length === 0 ? <section className="card"><p className="mute">No merchant has replied “interested” yet. Send a proposal on the Proposals page. When a merchant clicks Interested in the email, they appear here with a ready checklist.</p><a className="btn pri" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center' }} href="#/proposals">Go to proposals</a></section> :
+        <div className="grid2 split" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.3fr)', alignItems: 'start' }}>
+          <section className="card"><span className="eyebrow">Queue</span><table><tbody>{queue.map(x => { const d = (checks.find(c => c.id === x.id)?.done || []).length; return <tr key={x.id} className="tr" onClick={() => { setSel(x.id); history.replaceState(null, '', '#/enable?id=' + x.id); }} style={{ outline: p && x.id === p.id ? '2px solid var(--acc)' : 'none', outlineOffset: -2 }}><td><b>{S.MERCH[x.merchantId].name}</b><div className="mute sm">{x.instruments.map(i => S.INST[i]).join(', ')}</div></td><td><span className={'pill ' + (x.status === 'live' ? 'ok' : 'warn')}>{x.status === 'live' ? 'Live' : d + '/' + STEPS.length}</span></td></tr>; })}</tbody></table></section>
+          {p && <section className="card fade"><div className="row between wrap"><div className="col" style={{ gap: 2 }}><span className="eyebrow">Checklist</span><h2 style={{ fontSize: 20, letterSpacing: '-.02em' }}>{S.MERCH[p.merchantId].name} · {p.instruments.map(i => S.INST[i]).join(', ')}</h2></div><b className="num sm">{done.length}/{STEPS.length}</b></div><Bar v={done.length} max={STEPS.length} />
+            <div>{STEPS.map(([s, owner], i) => <label key={i} className="check"><input type="checkbox" disabled={!canEdit || p.status === 'live'} checked={done.includes(i)} onChange={() => toggle(i)} /><span className="col" style={{ gap: 0 }}><span>{s}</span><span className="mute sm">Owner: {owner}</span></span></label>)}</div>
+            {p.status !== 'live' ? <button className="btn pri" style={{ alignSelf: 'flex-start' }} disabled={done.length < STEPS.length || !canEdit} onClick={live}>Mark as live</button> : <span className="pill ok" style={{ alignSelf: 'flex-start' }}>Live. Eligible for the pilot cohort.</span>}
+            <span className="mute sm">Created automatically when the merchant replied “interested”.</span></section>}
+        </div>}
     </>
   );
 }

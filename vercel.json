@@ -1,1 +1,16 @@
-{ "functions": { "api/agent.js": { "maxDuration": 60 } } }
+{
+ "functions": {
+  "api/agent.js": {
+   "maxDuration": 60
+  },
+  "api/send.js": {
+   "maxDuration": 30
+  }
+ },
+ "crons": [
+  {
+   "path": "/api/brief",
+   "schedule": "30 2 * * *"
+  }
+ ]
+}

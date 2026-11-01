@@ -5,9 +5,10 @@ test('kpis consistent', () => { const k = S.kpis(); assert.equal(k.n, 5000); ass
 test('pattern 1 surfaces as top leak', () => { const f = S.findings()[0]; assert.match(f.title, /Acquirer C/); assert.ok(f.gap < -4); });
 test('pattern 3 issuer 07', () => assert.match(S.findings()[1].title, /Issuer 07/));
 test('pattern 2 and 4 present', () => { const f = S.findings(); assert.ok(f[2].etShare < f[2].restShare / 2); assert.ok(f[3].ts.high.share < f[3].ts.low.share / 2); });
+test('new cases detected', () => { const f = S.findings(); assert.equal(f.length, 7); assert.match(f[4].title, /Acquirer B success dip/); assert.match(f[5].title, /Daily Pantry/); assert.match(f[6].title, /Acquirer A × Visa/); assert.ok(f[0].route && f[0].route.diff > 0); });
 test('matrix has 4x7', () => { const m = S.matrix(); assert.equal(m.length, 4); assert.equal(m[0].length, 7); });
 test('emi formula', () => { assert.ok(Math.abs(S.emi(12000, 0, 12) - 1000) < 1e-9); assert.ok(S.emi(12000, 12, 12) > 1000 && S.emi(12000, 12, 12) < 1100); });
-test('every offline finding returns steps and an action', () => { for (const id of ['f1', 'f2', 'f3', 'f4']) { const r = offlineAgent(id); assert.ok(r.steps.length >= 2); assert.ok(r.finding.cause && r.finding.action && r.finding.confidence); } });
+test('every offline finding returns steps and an action', () => { for (const id of ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7']) { const r = offlineAgent(id); assert.ok(r.steps.length >= 2); assert.ok(r.finding.cause && r.finding.action && r.finding.confidence); } });
 test('simulation is a difference in success, not a gross count', () => { const mi = S.MERCH.findIndex(m => m.name === 'Orbit Electronics'); const r = S.simulateShift(mi, 10); assert.ok(r.moved > 0); assert.ok(Math.abs(r.delta) < r.moved * 0.1, 'delta must be far smaller than moved'); assert.ok(r.delta < 1); assert.equal(S.simulateShift(mi, 0).delta, 0); });
 test('finding 1 labels the combined cut', () => assert.match(S.findings()[0].subtitle, /debit \+ credit combined/));
 test('unknown tool safe', () => assert.ok(runTool('nope').error));

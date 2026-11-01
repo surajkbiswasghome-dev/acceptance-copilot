@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as S from '../lib/stats.js';
 import { offlineAgent, offlineAnswer } from '../lib/agent.js';
-import { useKey, audit } from '../lib/store.js';
+import { useColl, put, del, audit } from '../lib/db.js';
+import Actions from './Actions.jsx';
 import { Head, AiTag, Tick, Gate, Mic } from '../ui.jsx';
 
 async function callAgent(payload) {
@@ -19,7 +20,7 @@ const fromHash = () => (location.hash.split('?id=')[1] || 'f1').split('&')[0];
 export default function Explain({ role }) {
   const items = React.useMemo(() => S.findings(), []);
   const [id, setId] = useState(fromHash());
-  const [dec, setDec] = useKey('ac_dec', {});
+  const decisions = useColl('decisions'); const dec = Object.fromEntries(decisions.map(x => [x.id, x.status]));
   const [run, setRun] = useState(null); const [shown, setShown] = useState(0); const [err, setErr] = useState(false);
   const [q, setQ] = useState(''); const [qa, setQa] = useState([]); const [busy, setBusy] = useState(false);
   const seq = useRef(0);
@@ -32,8 +33,8 @@ export default function Explain({ role }) {
   }, [id]);
   const item = items.find(f => f.id === id) || items[0];
   const d = dec[item.id]; const stepsDone = run && shown >= run.steps.length; const done = stepsDone && !run.pending; const waiting = stepsDone && run.pending;
-  const decide = v => { setDec(x => ({ ...x, [item.id]: v })); audit(role.name, v === 'approved' ? 'Approved' : 'Rejected', item.title, run?.finding?.action || ''); };
-  const reopen = () => { setDec(x => { const n = { ...x }; delete n[item.id]; return n; }); audit(role.name, 'Reopened', item.title); };
+  const decide = v => { put('decisions', { id: item.id, status: v, by: role.name, ts: new Date().toISOString() }); audit(role.name, v === 'approved' ? 'Approved' : 'Rejected', item.title, run?.finding?.action || ''); };
+  const reopen = () => { del('decisions', item.id); audit(role.name, 'Reopened', item.title); };
   const ask = async text => { const t = (text ?? q).trim(); if (!t) return; setBusy(true); setQ(''); const r = await callAgent({ question: t }); setQa(a => [{ q: t, a: r.answer, tool: r.tool || r.steps?.[0]?.tool, mode: r.mode }, ...a]); setBusy(false); };
   return (
     <>
@@ -56,6 +57,7 @@ export default function Explain({ role }) {
               <span className="mute sm">{role.canApprove ? 'A person decides. Nothing changes until you approve.' : 'Your role cannot approve actions. Ask the Acceptance PM.'}</span></div>
               : <div className="row wrap"><span className={'pill ' + (d === 'approved' ? 'ok' : 'bad')} style={{ fontSize: 14, padding: '8px 14px' }}>{d === 'approved' ? 'Approved and recorded' : 'Rejected and recorded'}</span><button className="btn" style={{ border: 0, textDecoration: 'underline', color: 'var(--mute)' }} onClick={reopen}>Reopen decision</button></div>}
           </section>}
+          {done && d === 'approved' && <Actions f={item} run={run} role={role} />}
           <section className="col" aria-label="Ask a follow-up"><label htmlFor="ask" className="sm mute" style={{ fontWeight: 600 }}>Ask Copilot</label>
             <form className="row" onSubmit={e => { e.preventDefault(); ask(); }}><input id="ask" type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="For example: which issuer is declining the most?" /><Mic onText={t => ask(t)} /><button className="btn pri" disabled={busy}>{busy ? '…' : 'Ask'}</button></form>
             {qa.map((x, i) => <div key={i} className="insight col fade" style={{ gap: 4 }}><span className="sm mute">{x.q}</span><span>{x.a}</span>{x.tool && <span className="chip">{x.tool}</span>}</div>)}

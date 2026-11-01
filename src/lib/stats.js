@@ -80,7 +80,55 @@ export function findings() {
   items.push({ id: 'f3', gate: 'Preference', title: 'UPI + RuPay credit in electronics and travel', subtitle: 'Share ' + etShare + '% vs ' + restShare + '% elsewhere · success ' + rate(TX.filter(t => t.inst === 5)) + '%', gap: null, impact: 'Works well when used; rarely chosen', etShare, restShare });
   const ts = ticketSplit(6);
   items.push({ id: 'f4', gate: 'Preference', title: 'UPI + credit line at high tickets', subtitle: 'Share ' + ts.high.share + '% at ₹25k+ vs ' + ts.low.share + '% below · n(₹25k+) = ' + ts.high.n, gap: null, impact: 'High-ticket payments rarely use the credit line', ts });
+  const inc = detectIncident();
+  if (inc) items.push({ id: 'f5', gate: 'Experience', title: inc.acquirer + ' success dip, ' + dayLabel(inc.from) + ' to ' + dayLabel(inc.to), subtitle: 'Success ' + inc.low + '% on those days vs ' + inc.normal + '% normally · n = ' + inc.n, gap: r1(inc.low - inc.normal), impact: inc.lost + ' extra failed payments during the dip', inc });
+  const cfg = detectConfigMerchant();
+  if (cfg) items.push({ id: 'f6', gate: 'Enablement', title: cfg.merchant.name + ' configuration declines', subtitle: cfg.rate + '% of its payments hit configuration declines vs ' + cfg.restRate + '% elsewhere · n = ' + cfg.n, gap: null, impact: cfg.count + ' declines in 30 days', cfg });
+  const au = detectAuth();
+  if (au) items.push({ id: 'f7', gate: 'Experience', title: au.acquirer + ' × ' + au.instrument + ' authentication failures', subtitle: au.rate + '% authentication failures vs ' + au.others + '% at other acquirers · n = ' + au.n, gap: null, impact: au.count + ' authentication declines in 30 days', au });
+  const routes = { f1: bestRoute(isRupay, aIdx), f7: au ? bestRoute(i => i === au.inst, au.ai) : null };
+  const acts = { f1: ['ticket', 'routing', 'escalate'], f2: ['ticket', 'escalate'], f3: ['proposal', 'ticket'], f4: ['proposal', 'ticket'], f5: ['ticket', 'escalate'], f6: ['ticket'], f7: ['ticket', 'routing', 'escalate'] };
+  items.forEach(f => { f.actions = acts[f.id]; f.route = routes[f.id] || null; });
   return items;
+}
+
+export const dayLabel = d => { const x = new Date(); x.setDate(x.getDate() - (29 - d)); return x.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); };
+export function dailySeries(filter = () => true) {
+  return Array.from({ length: 30 }, (_, day) => { const rows = TX.filter(t => t.day === day && filter(t)); return { day, n: rows.length, rate: rate(rows) }; });
+}
+export function detectIncident() {
+  let best = null;
+  ACQ.forEach((name, ai) => {
+    const series = dailySeries(t => t.acq === ai); const sorted = series.map(d => d.rate).filter(x => x != null).sort((a, b) => a - b);
+    const med = sorted[Math.floor(sorted.length / 2)]; const low = series.filter(d => d.n >= 15 && d.rate < med - 7);
+    if (low.length < 2) return;
+    const n = low.reduce((a, d) => a + d.n, 0); const lowRate = r1(low.reduce((a, d) => a + d.rate * d.n, 0) / n);
+    const lost = Math.round(n * (med - lowRate) / 100); if (!best || lost > best.lost) best = { acquirer: name, ai, from: low[0].day, to: low[low.length - 1].day, low: lowRate, normal: med, n, lost, series };
+  });
+  return best;
+}
+export function detectConfigMerchant() {
+  const overall = TX.filter(t => t.st === 6).length / TX.length;
+  let best = null;
+  MERCH.forEach((m, i) => { const rows = TX.filter(t => t.m === i); if (rows.length < 30) return; const c = rows.filter(t => t.st === 6).length; const r = c / rows.length; if (r > 3 * overall && (!best || r > best.r)) best = { merchant: m, mi: i, r, n: rows.length, count: c }; });
+  if (!best) return null;
+  const rest = TX.filter(t => t.m !== best.mi); return { merchant: best.merchant, mi: best.mi, n: best.n, count: best.count, rate: r1(best.r * 100), restRate: r1(100 * rest.filter(t => t.st === 6).length / rest.length) };
+}
+export function detectAuth() {
+  let best = null;
+  ACQ.forEach((name, ai) => INST.forEach((iname, ii) => {
+    const mine = TX.filter(t => t.acq === ai && t.inst === ii); if (mine.length < 100) return;
+    const others = TX.filter(t => t.acq !== ai && t.inst === ii); const r = mine.filter(t => t.st === 4).length / mine.length; const o = others.filter(t => t.st === 4).length / others.length;
+    if (r > 2 * o && r > 0.03 && (!best || r / (o || 0.001) > best.score)) best = { acquirer: name, ai, instrument: iname, inst: ii, n: mine.length, count: mine.filter(t => t.st === 4).length, rate: r1(r * 100), others: r1(o * 100), score: r / (o || 0.001) };
+  }));
+  return best;
+}
+// Best-suited acquirer for a set of instruments, excluding one. Implied effect is arithmetic, not a forecast.
+export function bestRoute(instFilter, fromAi) {
+  const stat = ACQ.map((name, ai) => { const rows = TX.filter(t => t.acq === ai && instFilter(t.inst)); return { name, ai, n: rows.length, rate: rate(rows) }; });
+  const from = stat[fromAi]; const cand = stat.filter(x => x.ai !== fromAi && x.n >= 80).sort((a, b) => b.rate - a.rate)[0];
+  if (!cand) return null;
+  return { from: from.name, fromAi, fromRate: from.rate, fromN: from.n, to: cand.name, toAi: cand.ai, toRate: cand.rate, toN: cand.n, diff: r1(cand.rate - from.rate), implied: Math.round(from.n * (cand.rate - from.rate) / 100) };
 }
 
 // Affordability: standard EMI formula, rate and tenure are inputs, nothing hardcoded about MDR.
@@ -121,4 +169,29 @@ export function simulateShift(mi, shiftPct, inst = 5) {
   const moved = Math.round((p.n * shiftPct) / 100);
   const delta = Math.round(moved * (instRate - base)) / 100 || 0;
   return { moved, instRate, base, delta, value: Math.round(delta * p.avgTicket), n: p.n, avgTicket: p.avgTicket };
+}
+
+// Peer benchmark for a merchant and instrument. Synthetic data; benchmark arithmetic, not a forecast.
+export function peerBenchmark(mi, inst) {
+  const m = MERCH[mi];
+  const peers = MERCH.map((x, i) => i).filter(i => i !== mi && MERCH[i].category === m.category && MERCH[i].enabled[inst]);
+  const rows = TX.filter(t => peers.includes(t.m)); const x = rows.filter(t => t.inst === inst); const all = TX.filter(t => t.inst === inst);
+  const same = MERCH.map((y, i) => i).filter(i => i !== mi && MERCH[i].category === m.category);
+  const avg = a => (a.length ? Math.round(a.reduce((q, t) => q + t.amt, 0) / a.length) : null);
+  const cards = TX.filter(t => t.inst <= 3);
+  return { peers: peers.length, sameCategory: same.length, share: rows.length ? r1(pct(x.length, rows.length)) : null, success: rate(x), peerN: x.length,
+    avgOn: avg(all), avgAll: avg(TX), networkShare: r1(pct(all.length, TX.length)), networkSuccess: rate(all), cardSuccess: rate(cards), merchantAvg: merchantProfile(mi).avgTicket };
+}
+export function categoryInstrumentMatrix() {
+  const cats = [...new Set(MERCH.map(m => m.category))];
+  return cats.map(c => { const rows = TX.filter(t => t.cat === c); return { category: c, n: rows.length, shares: INST.map((_, i) => r1(pct(rows.filter(t => t.inst === i).length, rows.length))) }; });
+}
+export function proposalCandidates(findingId) {
+  const out = [];
+  MERCH.forEach((m, i) => {
+    const p = merchantProfile(i);
+    if (findingId === 'f3' && ['Electronics', 'Travel'].includes(m.category) && (!m.enabled[5] || (p.mix[5].share || 0) < 2)) out.push({ mi: i, inst: 5 });
+    if (findingId === 'f4' && p.avgTicket >= 12000 && !m.enabled[6]) out.push({ mi: i, inst: 6 });
+  });
+  return out;
 }

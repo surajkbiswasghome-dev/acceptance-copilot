@@ -32,6 +32,19 @@ check('pattern3 issuer spike', idr(6) > 2 * others, f'Issuer 07 issuer-decline {
 # 4: credit line at high tickets
 big = [r for r in T if r[5] >= 25000]; small = [r for r in T if r[5] < 25000]
 check('pattern4 credit line high-ticket share', sh(big, 6) < 0.25 * sh(small, 6), f'share {sh(big,6):.2f}% (>=25k) vs {sh(small,6):.2f}% (<25k)')
+# 5: outage at Acquirer B, days 18-20
+def day_rate(a, days): rows=[r for r in T if r[2]==a and r[0] in days]; return rate(rows)
+inc = day_rate(1, range(18,21)); norm = day_rate(1, [d for d in range(30) if d not in (18,19,20)])
+check('pattern5 outage at Acquirer B', norm - inc >= 6, f'B days 18-20 {inc:.1f}% vs other days {norm:.1f}%')
+# 6: misconfigured merchant
+best = max(range(len(M)), key=lambda i: sum(1 for r in T if r[1]==i and r[6]==6) / max(1, sum(1 for r in T if r[1]==i)))
+n_i = sum(1 for r in T if r[1]==best); cfg = sum(1 for r in T if r[1]==best and r[6]==6)
+rest_cfg = 100*sum(1 for r in T if r[1]!=best and r[6]==6)/sum(1 for r in T if r[1]!=best)
+check('pattern6 merchant misconfiguration', 100*cfg/n_i > 4*max(rest_cfg,0.2), f'{M[best]["name"]} config declines {100*cfg/n_i:.1f}% vs rest {rest_cfg:.2f}%')
+# 7: Visa auth failures at Acquirer A
+def auth(rows): return 100*sum(r[6]==4 for r in rows)/len(rows)
+va = [r for r in T if r[3]==2 and r[2]==0]; vo = [r for r in T if r[3]==2 and r[2]!=0]
+check('pattern7 Visa auth failures at Acquirer A', auth(va) > 2*auth(vo), f'A {auth(va):.1f}% vs others {auth(vo):.1f}%')
 # enable flags
 check('enable flags', all(len(m['enabled']) == 7 for m in M) and any(not m['enabled'][5] for m in M), 'flags present')
 sys.exit(1 if fails else 0)

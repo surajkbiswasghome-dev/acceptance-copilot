@@ -1,51 +1,39 @@
 import React, { useMemo, useState } from 'react';
 import * as S from '../lib/stats.js';
+import { useColl, put, audit, uid } from '../lib/db.js';
 import { Head, Gate } from '../ui.jsx';
 
 const presets = ['Electronics', 'Travel', 'Grocery'].map(c => S.MERCH.findIndex(m => m.category === c));
-export default function Recommend() {
-  const [mi, setMi] = useState(presets[0]);
+const money = v => (v == null ? '–' : '₹' + Math.round(v).toLocaleString('en-IN'));
+export default function Recommend({ role }) {
+  const [mi, setMi] = useState(presets[0]); const props = useColl('proposals'); const [made, setMade] = useState(null);
   const r = useMemo(() => S.recommend(mi), [mi]); const p = r.profile; const m = p.merchant;
-  const [price, setPrice] = useState(null); const P = price ?? Math.max(5000, p.avgTicket);
-  const [months, setMonths] = useState(6); const [rate, setRate] = useState(14);
-  const [fm, setFm] = useState(40); const [fi, setFi] = useState(30); const [fn, setFn] = useState(0);
-  const [shift, setShift] = useState(5);
-  const e = S.emi(P, rate, months), interest = e * months - P, cust = Math.max(0, 100 - fm - fi - fn), over = fm + fi + fn > 100;
-  const sim = S.simulateShift(mi, shift); const sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '') ;
-  const money = v => '₹' + Math.round(v).toLocaleString('en-IN');
+  const cov = r.recs.filter(x => x.gate === 'Coverage'); const pref = r.recs.filter(x => x.gate !== 'Coverage');
+  const insts = cov.map(x => S.INST.indexOf(x.instrument)).filter(i => i >= 0);
+  const bench = [5, 6].map(i => ({ i, b: S.peerBenchmark(mi, i) }));
+  const existing = props.find(x => x.merchantId === mi && x.status !== 'not_now');
+  const canEdit = ['pm', 'head', 'en'].includes(role.id);
+  const create = async () => { const now = new Date().toISOString(); const id = uid('PRP'); await put('proposals', { id, merchantId: mi, instruments: insts, status: 'draft', created: now, ts: now, events: [{ ts: now, who: role.name, text: 'Draft created from recommendation' }] }); await audit(role.name, 'Created proposal', m.name, id); setMade(id); };
   return (
     <>
-      <Head title="Recommend" sub="Pick a merchant profile. Rules decide what to enable and which offer fits. Nothing here is a forecast." />
-      <div className="row wrap"><span className="sm mute">Profile</span>{presets.map(i => <button key={i} className={'btn' + (mi === i ? ' pri' : '')} style={{ minHeight: 38 }} onClick={() => { setMi(i); setPrice(null); }}>{S.MERCH[i].category}</button>)}
-        <select style={{ width: 'auto', minHeight: 38 }} value={mi} onChange={e => { setMi(+e.target.value); setPrice(null); }} aria-label="Merchant">{S.MERCH.map((x, i) => <option key={i} value={i}>{x.name} · {x.category}</option>)}</select></div>
-      <section className="card"><div className="row between wrap"><div className="col" style={{ gap: 2 }}><b style={{ fontSize: 20 }}>{m.name}</b><span className="mute sm">{m.category} · {m.segment} · {m.acquirer} · average ticket {money(p.avgTicket)} · {p.n} payments in 30 days · success {p.success}%</span></div></div>
-        <div style={{ overflowX: 'auto' }}><table><thead><tr><th>Instrument</th><th>Enabled</th><th>Share</th><th>Success</th></tr></thead><tbody>{p.mix.map(x => <tr key={x.instrument}><td>{x.instrument}</td><td><span className={'pill ' + (x.enabled ? 'ok' : 'bad')}>{x.enabled ? 'Enabled' : 'Not enabled'}</span></td><td className="num">{x.share ?? '–'}%</td><td className="num">{x.success ?? '–'}%</td></tr>)}</tbody></table></div></section>
-      <section className="card"><div className="row between"><span className="eyebrow">What to enable or offer next</span><span className="pill">Rules-based</span></div>
+      <Head title="Recommend" sub="For a merchant, what to enable and why, using what similar merchants on the network already see. It leads straight to a proposal." />
+      <div className="row wrap"><span className="sm mute">Merchant</span>{presets.map(i => <button key={i} className={'btn' + (mi === i ? ' pri' : '')} style={{ minHeight: 38 }} onClick={() => { setMi(i); setMade(null); }}>{S.MERCH[i].category}</button>)}
+        <select style={{ width: 'auto', minHeight: 38 }} value={mi} onChange={e => { setMi(+e.target.value); setMade(null); }} aria-label="Merchant">{S.MERCH.map((x, i) => <option key={i} value={i}>{x.name} · {x.category}</option>)}</select></div>
+      <section className="card"><div className="col" style={{ gap: 2 }}><b style={{ fontSize: 20 }}>{m.name}</b><span className="mute sm">{m.category} · {m.segment} · {m.acquirer} · average ticket {money(p.avgTicket)} · {p.n} payments in 30 days · success {p.success}%</span></div>
+        <div style={{ overflowX: 'auto' }}><table><thead><tr><th>Instrument</th><th>Enabled</th><th>Share of its payments</th><th>Success</th></tr></thead><tbody>{p.mix.map(x => <tr key={x.instrument}><td>{x.instrument}</td><td><span className={'pill ' + (x.enabled ? 'ok' : 'bad')}>{x.enabled ? 'Enabled' : 'Not enabled'}</span></td><td className="num">{x.share ?? '–'}%</td><td className="num">{x.success ?? '–'}%</td></tr>)}</tbody></table></div></section>
+      <section className="card"><div className="row between wrap"><span className="eyebrow">What similar merchants see</span><span className="pill">Peer benchmark, synthetic data</span></div>
+        <div className="grid2e">{bench.map(({ i, b }) => <div key={i} className="insight col" style={{ gap: 8 }}><b>{S.INST[i]}</b>
+          <div className="row between sm"><span>{m.category} merchants that accept it</span><b className="num">{b.peers} of {b.sameCategory}</b></div>
+          <div className="row between sm"><span>Share of their payments</span><b className="num">{b.share ?? '–'}%</b></div>
+          <div className="row between sm"><span>Success on the network</span><b className="num">{b.networkSuccess}% (cards {b.cardSuccess}%)</b></div>
+          <div className="row between sm"><span>Average ticket on it vs {m.name}</span><b className="num">{money(b.avgOn)} vs {money(b.merchantAvg)}</b></div>
+          {b.share != null && <div className="row between sm"><span>If {m.name} matched its peers</span><b className="num">about {b.share} in every 100 payments</b></div>}</div>)}</div>
+        <span className="mute sm">Benchmark arithmetic from the demo dataset, not a forecast. Only a pilot can show what this merchant would actually see.</span></section>
+      <section className="card"><div className="row between"><span className="eyebrow">Recommended next steps</span><span className="pill">Rules-based</span></div>
         {r.recs.length === 0 && <p className="mute">This merchant already covers the instruments its profile suggests.</p>}
-        <div className="list">{r.recs.map((x, i) => <div key={i} className="row between wrap"><div className="col" style={{ gap: 2, flex: 1, minWidth: 220 }}><b>{x.instrument}</b><span className="mute sm">{x.why}</span></div><Gate g={x.gate} /></div>)}</div>
-        {r.recs.length > 0 && <a className="btn pri" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center' }} href={'#/enable?m=' + mi}>Prepare enablement</a>}</section>
-      <section className="grid2e">
-        <div className="card"><span className="eyebrow">Installment offer and funding split</span>
-          <label className="col" style={{ gap: 4 }}><span className="row between sm"><span>Ticket</span><b className="num">{money(P)}</b></span><input type="range" min="1000" max="100000" step="500" value={P} onChange={e => setPrice(+e.target.value)} /></label>
-          <label className="col" style={{ gap: 4 }}><span className="row between sm"><span>Tenure</span><b>{months} months</b></span><input type="range" min="3" max="24" step="3" value={months} onChange={e => setMonths(+e.target.value)} /></label>
-          <label className="col" style={{ gap: 4 }}><span className="row between sm"><span>Interest rate (input, per year)</span><b className="num">{rate}%</b></span><input type="range" min="0" max="24" step="1" value={rate} onChange={e => setRate(+e.target.value)} /></label>
-          <div className="insight row between wrap"><span className="col" style={{ gap: 0 }}><span className="eyebrow" style={{ fontSize: 11 }}>Monthly installment</span><b className="num" style={{ fontSize: 22 }}>{money(e)}</b></span><span className="col" style={{ gap: 0 }}><span className="eyebrow" style={{ fontSize: 11 }}>Total interest</span><b className="num" style={{ fontSize: 22 }}>{money(interest)}</b></span></div>
-          <span className="eyebrow">Who funds the interest</span>
-          {[['Merchant', fm, setFm], ['Issuer', fi, setFi], ['Network', fn, setFn]].map(([n, v, set]) => <label key={n} className="col" style={{ gap: 2 }}><span className="row between sm"><span>{n}</span><b className="num">{v}% · {money(interest * v / 100)}</b></span><input type="range" min="0" max="100" step="5" value={v} onChange={e => set(+e.target.value)} /></label>)}
-          <div className="row between sm"><span>Customer pays</span><b className="num">{cust}% · {money(interest * cust / 100)}</b></div>
-          {over ? <div className="err sm">Funding shares add up to more than 100%. Reduce one.</div> : cust === 0 ? <span className="pill ok">No-cost for the customer</span> : null}
-          <span className="mute sm">Rates and splits are inputs to explore. They are not commercial terms.</span></div>
-        <div className="card"><span className="eyebrow">Simulation</span><div className="banner">Simulation, not a forecast. Change the assumption to see what it implies.</div>
-          <label className="col" style={{ gap: 4 }}><span className="row between sm"><span>Share of payments that move to UPI + RuPay credit</span><b className="num">{shift}%</b></span><input type="range" min="0" max="20" value={shift} onChange={e => setShift(+e.target.value)} /></label>
-          <div className="insight col" style={{ gap: 8 }}>
-            <div className="row between sm"><span>Merchant payments in 30 days (data)</span><b className="num">{sim.n}</b></div>
-            <div className="row between"><span>Payments shifted to this instrument</span><b className="num">{sim.moved}</b></div>
-            <div className="row between sm"><span>Success on this instrument (network data)</span><b className="num">{sim.instRate}%</b></div>
-            <div className="row between sm"><span>Success at this merchant today (data)</span><b className="num">{sim.base}%</b></div>
-            <div className="row between"><span>Implied change in successful payments</span><b className="num">{sgn(sim.delta)}{Math.abs(sim.delta).toFixed(1)}</b></div>
-            <div className="row between"><span>Implied change in value at average ticket</span><b className="num">{sgn(sim.value)}{money(Math.abs(sim.value))}</b></div></div>
-          <span className="mute sm">Change = (success on this instrument − success today) × payments shifted. These customers would have paid another way and often succeeded, so the change can be near zero or negative. Reach, affordability and basket size are what a pilot would test. Only a pilot can show a real effect.</span></div>
-      </section>
+        <div className="list">{r.recs.map((x, i) => <div key={i} className="row between wrap"><div className="col" style={{ gap: 2, flex: 1, minWidth: 220 }}><b>{x.instrument}</b><span className="mute sm">{x.why}{x.gate !== 'Coverage' ? ' Tested through the pilot, as a checkout prompt or offer.' : ''}</span></div><Gate g={x.gate} /></div>)}</div>
+        {insts.length > 0 && canEdit && (made || existing ? <a className="btn pri" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center' }} href={'#/proposals?id=' + (made || existing.id)}>{made ? 'Draft created. Open the proposal' : 'A proposal already exists. Open it'}</a> : <button className="btn pri" style={{ alignSelf: 'flex-start' }} onClick={create}>Create proposal for {insts.map(i => S.INST[i]).join(' and ')}</button>)}
+        {pref.length > 0 && insts.length === 0 && <span className="mute sm">No missing instruments. The checkout prompt and offer ideas above are tested through the pilot.</span>}</section>
     </>
   );
 }
