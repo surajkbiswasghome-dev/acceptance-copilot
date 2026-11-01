@@ -29,25 +29,27 @@ export default function Login({ onLogin, theme, setTheme }) {
     <div className="login">
       {steps && <SigningIn steps={steps} />}
       <div className="l">
-        <div className="row"><Logo size={32} /><b style={{ fontSize: 17 }}>Acceptance Copilot</b></div>
-        <div className="col" style={{ gap: 18 }}>
+        <div className="row"><Logo size={30} /><b style={{ fontSize: 17 }}>Sadhana Acceptance Copilot</b></div>
+        <div className="col" style={{ gap: 8 }}>
           <h1>See where acceptance leaks.</h1>
-          <p className="mute" style={{ maxWidth: '46ch', fontSize: 17 }}>It turns acceptance data into a prioritised, approvable action plan, and a small pilot tests whether it works.</p>
-          <Flow /><Facts />
+          <p className="mute" style={{ maxWidth: '54ch', fontSize: 15, margin: 0 }}>It turns acceptance data into a prioritised, approvable action plan. A person approves every action, and it is logged.</p>
         </div>
+        <Flow />
         <News compact />
-        <ul className="mute sm" style={{ margin: 0, paddingLeft: 18 }}><li>Numbers are computed in code. The AI explains and recommends.</li><li>A person approves every action, and it is logged.</li><li>Synthetic data only. No real payments or accounts.</li></ul>
+        <div className="mute sm">Numbers are computed in code; the AI explains and recommends. Synthetic data only.</div>
       </div>
       <div className="r">
-        <div className="row between"><div className="col" style={{ gap: 2 }}><h2 style={{ fontSize: 24, letterSpacing: '-.02em' }}>Sign in</h2><span className="mute sm">Choose a demo account</span></div><button className="btn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Ivory & Ink' : 'Midnight'}</button></div>
-        <div className="col" role="group" aria-label="Demo accounts">{ROLES.map((x, k) => <button key={x.id} className={'role' + (k === i ? ' on' : '')} aria-pressed={k === i} onClick={() => setI(k)}><span className="av">{x.short}</span><span className="col" style={{ gap: 0 }}><b>{x.name}</b><span className="mute sm">{x.sub}</span></span></button>)}</div>
-        <label className="col" style={{ gap: 4 }}><span className="sm mute">Your name (for the welcome)</span><input type="text" value={nm} onChange={e => setNm(e.target.value)} /></label>
-        <div className="col" style={{ gap: 6 }} role="radiogroup" aria-label="Welcome language"><span className="sm mute">Welcome message language (the rest of the platform stays in English)</span><div className="row wrap">{LANGS.map(x => <label key={x.id} className="row sm" style={{ gap: 6, border: '1px solid var(--line)', borderRadius: 999, padding: '6px 14px', background: L === x.id ? 'color-mix(in srgb, var(--acc) 18%, var(--s1))' : 'transparent', cursor: 'pointer' }}><input type="radio" name="wl" checked={L === x.id} onChange={() => setLang(v => ({ ...v, [r.id]: x.id }))} />{x.label}</label>)}</div></div>
-        <label className="col" style={{ gap: 4 }}><span className="sm mute">Email</span><input type="email" readOnly value={r.email} /></label>
+        <div className="row between"><div className="col" style={{ gap: 2 }}><h2 style={{ fontSize: 22, letterSpacing: '-.02em' }}>Sign in</h2><span className="mute sm">Choose a demo account</span></div><button className="btn" style={{ minHeight: 36 }} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Ivory & Ink' : 'Midnight'}</button></div>
+        <div className="roles" role="group" aria-label="Demo accounts">{ROLES.map((x, k) => <button key={x.id} className={'role' + (k === i ? ' on' : '')} aria-pressed={k === i} title={x.sub} onClick={() => setI(k)}><span className="av">{x.short}</span><span className="col" style={{ gap: 0, minWidth: 0 }}><b>{x.name.split(',')[0]}</b><span className="mute sm" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name.split(',')[1]}</span></span></button>)}</div>
+        <div className="grid2e" style={{ gap: 10 }}>
+          <label className="col" style={{ gap: 4 }}><span className="sm mute">Your name (for the welcome)</span><input type="text" value={nm} onChange={e => setNm(e.target.value)} /></label>
+          <label className="col" style={{ gap: 4 }}><span className="sm mute">Email</span><input type="email" readOnly value={r.email} /></label>
+        </div>
+        <div className="col" style={{ gap: 6 }} role="radiogroup" aria-label="Welcome language"><span className="sm mute">Welcome message language (the rest stays in English)</span><div className="row wrap" style={{ gap: 8 }}>{LANGS.map(x => <label key={x.id} className="row sm" style={{ gap: 6, border: '1px solid var(--line)', borderRadius: 999, padding: '5px 12px', background: L === x.id ? 'color-mix(in srgb, var(--acc) 18%, var(--s1))' : 'transparent', cursor: 'pointer' }}><input type="radio" name="wl" checked={L === x.id} onChange={() => setLang(v => ({ ...v, [r.id]: x.id }))} />{x.label}</label>)}</div></div>
         <label className="col" style={{ gap: 4 }}><span className="sm mute">Password</span><input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} /></label>
         {err && <div className="err sm">{err}</div>}
-        <button className="btn pri" style={{ minHeight: 50, fontSize: 16 }} disabled={busy} onClick={go}>{busy ? 'Signing in…' : 'Continue to workspace'}</button>
-        <p className="mute sm">Demo workspace. No real accounts or payment data.</p>
+        <button className="btn pri" style={{ minHeight: 48, fontSize: 16 }} disabled={busy} onClick={go}>{busy ? 'Signing in…' : 'Continue to workspace'}</button>
+        <p className="mute sm" style={{ margin: 0 }}>Demo workspace. No real accounts or payment data.</p>
       </div>
     </div>
   );

@@ -39,7 +39,7 @@ export default function App() {
   return (
     <div className="shell">
       <header className="top">
-        <a href="#/insights" className="brand"><Logo />Acceptance Copilot</a>
+        <a href="#/insights" className="brand"><Logo /><span className="brandname">Sadhana Acceptance Copilot</span></a>
         <nav className="nav" aria-label="Views">{role.views.map(k => <a key={k} href={'#/' + k} className={route === k ? 'on' : ''} aria-current={route === k ? 'page' : undefined}>{LABEL[k]}</a>)}</nav>
         <div style={{ flex: 1 }} className="spacer" />
         <div className="tools" style={{ position: 'relative' }}>

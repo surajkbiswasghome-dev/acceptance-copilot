@@ -11,8 +11,8 @@ const OFFICIAL = [
 let cache = { at: 0, items: [] };
 const dec = s => s.replace(/<!\[CDATA\[|\]\]>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
 function parse(xml, tag) {
-  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 6).map(m => { const b = m[1]; const g = k => (b.match(new RegExp('<' + k + '[^>]*>([\\s\\S]*?)</' + k + '>')) || [])[1]; const title = dec(g('title') || ''); const link = dec(g('link') || ''); const src = dec(g('source') || ''); const d = g('pubDate') ? new Date(dec(g('pubDate'))) : null;
-    return { tag, title: src && title.endsWith(' - ' + src) ? title.slice(0, -(src.length + 3)) : title, source: src, url: link, date: d && !isNaN(d) ? d.toISOString() : null }; }).filter(x => x.title && /^https?:\/\//.test(x.url));
+  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 6).map(m => { const b = m[1]; const g = k => (b.match(new RegExp('<' + k + '[^>]*>([\\s\\S]*?)</' + k + '>')) || [])[1]; const title = dec(g('title') || ''); const link = dec(g('link') || ''); const src = dec(g('source') || ''); const sUrl = (b.match(/<source[^>]*url="([^"]+)"/) || [])[1] || ''; const d = g('pubDate') ? new Date(dec(g('pubDate'))) : null;
+    return { tag, title: src && title.endsWith(' - ' + src) ? title.slice(0, -(src.length + 3)) : title, source: src, sourceUrl: sUrl, url: link, date: d && !isNaN(d) ? d.toISOString() : null }; }).filter(x => x.title && /^https?:\/\//.test(x.url));
 }
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'public, s-maxage=1200, stale-while-revalidate=3600');
