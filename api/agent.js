@@ -48,8 +48,8 @@ export default async function handler(req, res) {
   if (!key) return fallback('GEMINI_API_KEY is not set on the server (add it in Vercel and redeploy)');
   try {
     if (body.question) {
-      const facts = offlineAnswer(body.question); const all = S.findings().map(f => f.title + ': ' + f.subtitle).join(' | ');
-      const text = await ask(key, `Question: ${body.question}\nComputed evidence (tool ${facts.tool}): ${facts.answer}\nAll flagged findings: ${all}\nAnswer in two sentences using only this evidence.`);
+      const facts = offlineAnswer(body.question); if (facts.guard) return res.status(200).json({ tool: 'guardrail', answer: facts.answer, mode: 'guardrail' }); const all = S.findings().map(f => f.title + ': ' + f.subtitle).join(' | ');
+      const text = await ask(key, `Question: ${body.question}\nComputed evidence (tool ${facts.tool}): ${facts.answer}\nAll flagged findings: ${all}\nAnswer in two sentences using only this evidence. If the question is not about payment acceptance or this platform, say you can only help with those topics.`);
       return res.status(200).json({ mode: 'live', tool: facts.tool, answer: text.trim() });
     }
     const f = S.findings().find(x => x.id === body.id);

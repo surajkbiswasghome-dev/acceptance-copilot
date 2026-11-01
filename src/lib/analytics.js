@@ -140,3 +140,26 @@ export function levers(filters = {}) {
 export function coverageGrid() {
   const cats = [...new Set(MERCH.map(m => m.category))]; return { cats, insts: INST, cells: cats.map(c => { const ms = MERCH.filter(m => m.category === c); return INST.map((_, i) => Math.round((100 * ms.filter(m => m.enabled[i]).length) / ms.length)); }) };
 }
+
+// ---- Routing agent: instruments where another acquirer clearly did better, with benefits AND trade-offs ----
+export function recommendMoves(limit = 4) {
+  const out = [];
+  INST.forEach((name, inst) => {
+    const per = ACQ.map((_, a) => { const r = TX.filter(t => t.inst === inst && t.acq === a); return { a, n: r.length, success: METRICS.success.fn(r), cost: METRICS.cost.fn(r), p95: METRICS.p95.fn(r), merchants: new Set(r.map(t => t.m)).size, timeout: METRICS.timeout.fn(r) }; }).filter(x => x.n >= 60);
+    const total = per.reduce((a, x) => a + x.n, 0);
+    per.forEach(from => per.forEach(to => {
+      if (from.a === to.a || to.success - from.success < 3) return;
+      const share = 30; const sim = routeSim(inst, from.a, to.a, share); if (!sim || sim.extraSuccess < 2) return;
+      const load = r1((100 * sim.moved) / to.n); const trade = [];
+      if (to.cost > from.cost) trade.push(`Costs more: cost index ${from.cost} to ${to.cost} per payment (about ${r1((to.cost - from.cost) * sim.moved / 100)} index points on the moved volume).`);
+      if (to.p95 > from.p95) trade.push(`Slower at the tail: P95 latency ${from.p95} to ${to.p95} ms.`);
+      trade.push(`${ACQ[to.a]} takes on ${load}% more ${name} volume than it carries today. Check capacity with them first.`);
+      if (to.merchants <= 4) trade.push(`${ACQ[to.a]} serves only ${to.merchants} merchants on ${name}, so merchant coverage and onboarding effort matter.`);
+      if (to.n < 150) trade.push(`The evidence for ${ACQ[to.a]} rests on ${to.n} payments only, so the gain is less certain.`);
+      trade.push('Concentrating on one acquirer raises dependency risk. Keep a fallback and ramp gradually.');
+      out.push({ id: inst + '-' + from.a + '-' + to.a, inst, instName: name, from: from.a, to: to.a, share, sim, benefits: [`Success on ${name}: ${from.success}% to ${to.success}%.`, `About ${sim.extraSuccess} more successful payments on the moved ${sim.moved} (illustration, not a forecast).`, from.timeout > to.timeout ? `Timeouts: ${from.timeout}% to ${to.timeout}%.` : null, to.cost < from.cost ? `Cheaper: cost index ${from.cost} to ${to.cost}.` : null, to.p95 < from.p95 ? `Faster at the tail: P95 ${from.p95} to ${to.p95} ms.` : null].filter(Boolean), tradeoffs: trade, score: sim.extraSuccess });
+    }));
+  });
+  const best = {}; out.forEach(r => { const k = r.inst + '-' + r.from; if (!best[k] || r.score > best[k].score) best[k] = r; });
+  return Object.values(best).sort((a, b) => b.score - a.score).slice(0, limit);
+}

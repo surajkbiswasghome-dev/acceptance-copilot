@@ -210,3 +210,16 @@ export function merchantPotential(mi) {
   return { n: rows.length, basis: own ? 'your payments' : 'merchants like you', successPct: r1(100 * ok / n), insPct: r1(insPct), otherPct: r1(100 * other / n), okPct: r1(100 * ok / n), lowPts, highPts, per1000, avgTicket: p.avgTicket,
     valuePer1000: [per1000[0] * p.avgTicket, per1000[1] * p.avgTicket] };
 }
+
+// Instruments that can be proposed beyond the nine in the dataset. No demo merchant has them enabled and the dataset carries no figures for them, so proposals for these state no numbers.
+export const EXTRA_INST = [
+  { id: 'x:dcc', name: 'Dynamic currency conversion (DCC)', what: 'lets a customer paying with a foreign-issued card choose to pay in their home currency at checkout', fit: 'tourism, hotels, airlines, duty-free and other merchants with international visitors' },
+  { id: 'x:intl', name: 'International cards', what: 'accepts cards issued outside India so overseas customers can pay in the usual way', fit: 'travel, education, online services and gifting merchants with overseas customers' },
+  { id: 'x:emi', name: 'Card and cardless EMI', what: 'lets a customer split a larger purchase into instalments at checkout, with the instalment provider carrying the credit decision', fit: 'electronics, furniture, education and healthcare merchants with higher-value baskets' },
+  { id: 'x:link', name: 'Pay by link', what: 'sends the customer a secure payment link by message or email, so no checkout page is needed', fit: 'small merchants, field services, invoices and orders taken by phone' },
+  { id: 'x:qr', name: 'Dynamic QR at counter', what: 'shows a QR with the exact amount at the counter or on delivery, so the customer scans and pays', fit: 'stores, restaurants and delivery merchants collecting payment in person' },
+  { id: 'x:rec', name: 'Recurring payments (e-mandate)', what: 'lets a customer authorise repeat payments within limits they set, for subscriptions and bills', fit: 'subscriptions, utilities, insurance, education fees and memberships' },
+  { id: 'x:pl', name: 'Pay later at checkout', what: 'lets a customer pay after delivery or at month end, with a provider carrying the credit decision', fit: 'fashion, groceries and everyday online retail' },
+];
+export const instName = i => (typeof i === 'number' ? INST[i] : (EXTRA_INST.find(x => x.id === i) || { name: String(i) }).name);
+export const extraInst = i => EXTRA_INST.find(x => x.id === i);

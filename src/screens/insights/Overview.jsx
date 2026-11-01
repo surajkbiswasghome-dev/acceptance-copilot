@@ -1,3 +1,4 @@
+import { Info, Reveal } from '../../ui.jsx';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceArea, ComposedChart, Bar, Cell, AreaChart, Area } from 'recharts';
 import * as S from '../../lib/stats.js';
@@ -27,6 +28,9 @@ export default function Overview({ filters, goto }) {
   useEffect(() => { if (!play) return; const t = setInterval(() => setEnd(e => { if (e >= 29) { setPlay(false); return 29; } return e + 1; }), 650); return () => clearInterval(t); }, [play]);
   const cur = useMemo(() => A.kpiWindow(end - 6, end, filters), [end, filters]); const prev = useMemo(() => A.kpiWindow(end - 13, end - 7, filters), [end, filters]);
   const trend = useMemo(() => A.aggregate({ x: 'day', y: 'success', split: 'mode', filters, smooth: 3 }), [filters]);
+  const snake = play || end < 29;
+  const shown = useMemo(() => (snake ? trend.data.map((d, i) => (i <= end ? d : Object.fromEntries(Object.entries(d).map(([k, v]) => [k, k === 'x' || k === 'n' ? v : null])))) : trend.data), [trend, snake, end]);
+  const head = c => p => (snake && p.index === end && p.value != null ? <g key={'h' + p.index}><circle cx={p.cx} cy={p.cy} r={9} fill={c} opacity={0.25} /><circle cx={p.cx} cy={p.cy} r={5} fill={c} stroke="var(--s1)" strokeWidth={2} /></g> : <g key={'n' + p.index} />);
   const overall = useMemo(() => A.aggregate({ x: 'day', y: 'success', filters }).data.map(d => ({ v: d.All })), [filters]);
   const ins = useMemo(() => A.insights(end, 7, filters), [end, filters]);
   const modes = useMemo(() => A.shareOf('mode', filters).map(d => ({ ...d, color: MODE_COLORS[d.name] })), [filters]);
@@ -45,24 +49,24 @@ export default function Overview({ filters, goto }) {
       <Kpi label="Median latency" value={cur.latency} prev={prev.latency} suffix=" ms" good="down" />
       <Kpi label="Cost index (synthetic)" value={cur.cost} prev={prev.cost} dec={1} good="down" />
     </div>
-    <section className="col"><div className="row between wrap"><span className="eyebrow">What changed in this window</span><span className="mute sm">Compared with the 7 days before. Press play to watch it move through the month.</span></div>
+    <section className="col"><div className="row between wrap"><span className="eyebrow">What changed in this window<Info k="ov-changed" /></span><span className="mute sm">Compared with the 7 days before. Press play to watch it move through the month.</span></div>
       {ins.length === 0 ? <div className="insight mute">No change large enough to be worth flagging in this window.</div> : <div className="ictiles">{ins.map((i, k) => (
         <button key={i.id + end} className={'ic ' + i.dir} style={{ animationDelay: k * 70 + 'ms' }} onClick={() => pick(i.dim, i.who)}><span className="badge"><Arrow dir={i.dir} size={18} /></span><span className="col" style={{ gap: 2 }}><b>{i.text}</b><small>{i.n.toLocaleString('en-IN')} payments in window · click to break down</small></span></button>))}</div>}</section>
     <div className="grid-ins">
-      <section className="card span2"><div className="row between wrap"><span className="eyebrow">Success rate by payment mode, 30 days (3-day rolling)</span><span className="mute sm">Shaded band is the 7-day window above. Hover for values.</span></div>
-        <div style={{ height: 280 }}><ResponsiveContainer width="100%" height="100%"><LineChart data={trend.data} margin={{ left: -10, right: 8, top: 8 }}>
+      <section className="card span2"><div className="row between wrap"><span className="eyebrow">Success rate by payment mode, 30 days (3-day rolling)<Info k="ov-trend" /></span><span className="mute sm">Shaded band is the 7-day window above. Hover for values.</span></div>
+        <Reveal h={280}><div style={{ height: 280 }}><ResponsiveContainer width="100%" height="100%"><LineChart data={shown} margin={{ left: -10, right: 8, top: 8 }}>
           <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} /><XAxis dataKey="x" tick={AX} interval={2} stroke={GRID} /><YAxis domain={[80, 100]} ticks={[80, 85, 90, 95, 100]} allowDataOverflow tick={AX} stroke={GRID} unit="%" />
           <ReferenceArea x1={'D' + String(end - 5).padStart(2, '0')} x2={'D' + String(end + 1).padStart(2, '0')} fill="var(--acc)" fillOpacity={0.1} />
-          <Tooltip content={<Tip unit="%" />} />{trend.series.map(s => <Line key={s} type="monotone" dataKey={s} stroke={MODE_COLORS[s]} strokeWidth={2.4} dot={false} activeDot={{ r: 6 }} connectNulls animationDuration={1100} />)}</LineChart></ResponsiveContainer></div>
+          <Tooltip content={<Tip unit="%" />} />{trend.series.map(s => <Line key={s} type="monotone" dataKey={s} stroke={MODE_COLORS[s]} strokeWidth={2.4} dot={snake ? head(MODE_COLORS[s]) : false} activeDot={{ r: 6 }} connectNulls isAnimationActive={!snake} animationDuration={1100} />)}</LineChart></ResponsiveContainer></div></Reveal>
         <Legend2 data={trend.series.map(s => ({ name: s, color: MODE_COLORS[s] }))} onPick={n => pick('mode', n)} selected={drill?.dim === 'mode' ? drill.name : null} /></section>
-      <section className="card"><span className="eyebrow">Share of payments by mode</span><Donut data={modes} centre={cur.n ? A.filterRows(filters).length.toLocaleString('en-IN') : '0'} sub="payments, 30 days" onPick={n => pick('mode', n)} selected={drill?.dim === 'mode' ? drill.name : null} /><Legend2 data={modes} onPick={n => pick('mode', n)} selected={drill?.dim === 'mode' ? drill.name : null} /></section>
-      <section className="card"><span className="eyebrow">Why payments fail</span><Donut data={reasons} centre={reasons.reduce((a, r) => a + r.value, 0).toLocaleString('en-IN')} sub="failed payments" valueLabel="failures" onPick={(n) => { const r = reasons.find(x => x.name === n); setDrill(d => (d?.kind === 'reason' && d.st === r.st ? null : { kind: 'reason', st: r.st, name: n })); }} selected={drill?.kind === 'reason' ? drill.name : null} /><Legend2 data={reasons} onPick={n => { const r = reasons.find(x => x.name === n); setDrill({ kind: 'reason', st: r.st, name: n }); }} selected={drill?.kind === 'reason' ? drill.name : null} /></section>
-      <section className="card"><div className="row between wrap"><span className="eyebrow">Volume and success by acquirer</span><span className="mute sm">Bars: payments. Line: success. Click a bar.</span></div>
-        <div style={{ height: 260 }}><ResponsiveContainer width="100%" height="100%"><ComposedChart data={acqs} margin={{ left: -6, right: 6, top: 8 }}>
+      <section className="card"><span className="eyebrow">Share of payments by mode<Info k="ov-mode" /></span><Reveal h={260}><Donut data={modes} centre={cur.n ? A.filterRows(filters).length.toLocaleString('en-IN') : '0'} sub="payments, 30 days" onPick={n => pick('mode', n)} selected={drill?.dim === 'mode' ? drill.name : null} /></Reveal><Legend2 data={modes} onPick={n => pick('mode', n)} selected={drill?.dim === 'mode' ? drill.name : null} /></section>
+      <section className="card"><span className="eyebrow">Why payments fail<Info k="ov-fail" /></span><Reveal h={260}><Donut data={reasons} centre={reasons.reduce((a, r) => a + r.value, 0).toLocaleString('en-IN')} sub="failed payments" valueLabel="failures" onPick={(n) => { const r = reasons.find(x => x.name === n); setDrill(d => (d?.kind === 'reason' && d.st === r.st ? null : { kind: 'reason', st: r.st, name: n })); }} selected={drill?.kind === 'reason' ? drill.name : null} /></Reveal><Legend2 data={reasons} onPick={n => { const r = reasons.find(x => x.name === n); setDrill({ kind: 'reason', st: r.st, name: n }); }} selected={drill?.kind === 'reason' ? drill.name : null} /></section>
+      <section className="card"><div className="row between wrap"><span className="eyebrow">Volume and success by acquirer<Info k="ov-acq" /></span><span className="mute sm">Bars: payments. Line: success. Click a bar.</span></div>
+        <Reveal h={260}><div style={{ height: 260 }}><ResponsiveContainer width="100%" height="100%"><ComposedChart data={acqs} margin={{ left: -6, right: 6, top: 8 }}>
           <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} /><XAxis dataKey="x" tick={AX} stroke={GRID} /><YAxis yAxisId="l" tick={AX} stroke={GRID} /><YAxis yAxisId="r" orientation="right" domain={[80, 100]} tick={AX} stroke={GRID} unit="%" />
           <Tooltip content={<Tip />} cursor={{ fill: 'var(--s2)', opacity: 0.6 }} />
           <Bar yAxisId="l" dataKey="volume" name="Payments" radius={[8, 8, 0, 0]} onClick={d => pick('acquirer', d.x)} cursor="pointer" animationDuration={900}>{acqs.map((a, i) => <Cell key={a.x} fill={a.fill} opacity={drill?.dim === 'acquirer' && drill.name !== a.x ? 0.35 : 1} />)}</Bar>
-          <Line yAxisId="r" dataKey="success" name="Success %" stroke="var(--ink)" strokeWidth={2.4} dot={{ r: 5 }} activeDot={{ r: 8 }} animationDuration={1200} /></ComposedChart></ResponsiveContainer></div></section>
+          <Line yAxisId="r" dataKey="success" name="Success %" stroke="var(--ink)" strokeWidth={2.4} dot={{ r: 5 }} activeDot={{ r: 8 }} animationDuration={1200} /></ComposedChart></ResponsiveContainer></div></Reveal></section>
     </div>
     {rs && <div className="drill"><div className="row between wrap"><div className="col" style={{ gap: 2 }}><span className="eyebrow">Drill-down</span><b style={{ fontSize: 18 }}>{drill.kind === 'reason' ? drill.name : drill.name}</b></div>
       <div className="row wrap"><button className="btn" style={{ minHeight: 36 }} onClick={() => goto('explore', drill.kind === 'reason' ? {} : { filters: { [drill.dim]: drill.name } })}>Open in Explore</button><button className="btn" style={{ minHeight: 36 }} onClick={() => setDrill(null)}>Close</button></div></div>

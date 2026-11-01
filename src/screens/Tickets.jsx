@@ -31,7 +31,7 @@ export default function Tickets({ role }) {
   const addComment = async () => { if (!comment.trim()) return; await put('tickets', { ...t, events: [...t.events, { ts: new Date().toISOString(), who: role.name, text: comment.trim() }] }); setComment(''); };
   return (
     <>
-      <Head title="Tickets" sub="Investigations, routing changes and escalations raised from approved findings. DevOps works them here." right={<div className="seg">{['Open work', 'All', 'Investigation', 'Routing change', 'Escalation'].map(x => <button key={x} className={fs === x ? 'on' : ''} onClick={() => setFs(x)}>{x}</button>)}</div>} />
+      <Head help="tickets" title="Tickets" sub="Investigations, routing changes and escalations raised from approved findings. DevOps works them here." right={<div className="seg">{['Open work', 'All', 'Investigation', 'Routing change', 'Escalation'].map(x => <button key={x} className={fs === x ? 'on' : ''} onClick={() => setFs(x)}>{x}</button>)}</div>} />
       <div className="grid2 split" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', alignItems: 'start' }}>
         <section className="card"><span className="eyebrow">{rows.length} ticket{rows.length === 1 ? '' : 's'}</span>
           {rows.length === 0 ? <p className="mute">Nothing here yet. Approve a finding on the Explain screen, then raise a ticket.</p> :

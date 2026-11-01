@@ -16,7 +16,8 @@ export default function Proposals({ role }) {
   const p = all.find(x => x.id === sel); const counts = Object.keys(PSTATUS).map(k => [k, all.filter(x => x.status === k).length]);
   const mail = useMemo(() => (p ? proposalEmail(p) : null), [p?.id, p?.instruments?.join()]);
   const canEdit = ['pm', 'head', 'en'].includes(role.id);
-  const create = async () => { const now = new Date().toISOString(); const id = uid('PRP'); await put('proposals', { id, merchantId: nm, instruments: ni, status: 'draft', created: now, ts: now, events: [{ ts: now, who: role.name, text: 'Draft created' }] }); await audit(role.name, 'Created proposal', S.MERCH[nm].name, id); setSel(id); history.replaceState(null, '', '#/proposals?id=' + id); };
+  const valid = ni.filter(i => typeof i !== 'number' || !S.MERCH[nm].enabled[i]);
+  const create = async () => { if (!valid.length) return; const now = new Date().toISOString(); const id = uid('PRP'); await put('proposals', { id, merchantId: nm, instruments: valid, status: 'draft', created: now, ts: now, events: [{ ts: now, who: role.name, text: 'Draft created' }] }); await audit(role.name, 'Created proposal', S.MERCH[nm].name, id); setSel(id); history.replaceState(null, '', '#/proposals?id=' + id); };
   const ev = (text, extra = {}) => put('proposals', { ...p, ...extra, events: [...p.events, { ts: new Date().toISOString(), who: role.name, text }] });
   const send = async () => {
     setBusy(true); setMsg(null); const list = viaEmail ? to.filter(isEmail) : [];
@@ -35,17 +36,18 @@ export default function Proposals({ role }) {
   const simulate = (k, label) => ev('Simulated merchant reply: ' + label + ' (demo)', { status: k, intentAt: new Date().toISOString(), simulated: true });
   return (
     <>
-      <Head title="Proposals" sub="Offers to merchants for instruments they do not yet accept. No commercial terms. Merchants reply with one click, and a reply moves them into enablement." />
+      <Head help="proposals" title="Proposals" sub="Offers to merchants for instruments they do not yet accept. No commercial terms. Merchants reply with one click, and a reply moves them into enablement." />
       <div className="chiprow">{counts.map(([k, n]) => <span key={k} className={'pill ' + PSTATUS[k][1]}>{PSTATUS[k][0]}: {n}</span>)}</div>
       <div className="grid2 split" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.3fr)', alignItems: 'start' }}>
         <div className="col gap16">
           {canEdit && <section className="card"><span className="eyebrow">New proposal</span>
             <select value={nm} onChange={e => setNm(+e.target.value)} aria-label="Merchant">{S.MERCH.map((m, i) => <option key={i} value={i}>{m.name} · {m.category}</option>)}</select>
-            <div className="chiprow">{[1, 5, 6].map(i => <label key={i} className="row sm"><input type="checkbox" checked={ni.includes(i)} onChange={e => setNi(e.target.checked ? [...ni, i] : ni.filter(x => x !== i))} />{S.INST[i]}{S.MERCH[nm].enabled[i] ? ' (already enabled)' : ''}</label>)}</div>
-            <button className="btn pri" disabled={!ni.length} onClick={create}>Create draft</button></section>}
+            <div className="mute sm">Only options this merchant does not accept yet can be proposed. Ones already enabled are shown locked.</div>
+            <div className="chiprow">{S.INST.map((n, i) => { const on = !!S.MERCH[nm].enabled[i]; return <label key={i} className="row sm" style={{ opacity: on ? .55 : 1 }}><input type="checkbox" disabled={on} checked={!on && ni.includes(i)} onChange={e => setNi(e.target.checked ? [...ni, i] : ni.filter(x => x !== i))} />{n}{on ? ' · enabled' : ''}</label>; })}{S.EXTRA_INST.map(x => <label key={x.id} className="row sm" title={x.what}><input type="checkbox" checked={ni.includes(x.id)} onChange={e => setNi(e.target.checked ? [...ni, x.id] : ni.filter(y => y !== x.id))} />{x.name}</label>)}</div>
+            <button className="btn pri" disabled={!valid.length} onClick={create}>Create draft</button></section>}
           <section className="card"><span className="eyebrow">{rows.length} proposal{rows.length === 1 ? '' : 's'}</span>
             {rows.length === 0 ? <p className="mute">None yet. Create one here, from Recommend, or from an approved finding on Explain.</p> :
-              <table><thead><tr><th>Merchant</th><th>Status</th></tr></thead><tbody>{rows.map(x => <tr key={x.id} className="tr" onClick={() => { setSel(x.id); history.replaceState(null, '', '#/proposals?id=' + x.id); setMsg(null); }} style={{ outline: x.id === sel ? '2px solid var(--acc)' : 'none', outlineOffset: -2 }}><td><b>{S.MERCH[x.merchantId].name}</b><div className="mute sm">{x.instruments.map(i => S.INST[i]).join(', ')}</div></td><td><span className={'pill ' + PSTATUS[x.status][1]}>{PSTATUS[x.status][0]}</span></td></tr>)}</tbody></table>}</section>
+              <table><thead><tr><th>Merchant</th><th>Status</th></tr></thead><tbody>{rows.map(x => <tr key={x.id} className="tr" onClick={() => { setSel(x.id); history.replaceState(null, '', '#/proposals?id=' + x.id); setMsg(null); }} style={{ outline: x.id === sel ? '2px solid var(--acc)' : 'none', outlineOffset: -2 }}><td><b>{S.MERCH[x.merchantId].name}</b><div className="mute sm">{x.instruments.map(i => S.instName(i)).join(', ')}</div></td><td><span className={'pill ' + PSTATUS[x.status][1]}>{PSTATUS[x.status][0]}</span></td></tr>)}</tbody></table>}</section>
         </div>
         {p ? <section className="card fade"><div className="row between wrap"><div className="col" style={{ gap: 2 }}><span className="eyebrow">{p.id}</span><h2 style={{ fontSize: 20, letterSpacing: '-.02em' }}>{S.MERCH[p.merchantId].name}</h2></div><span className={'pill ' + PSTATUS[p.status][1]}>{PSTATUS[p.status][0]}</span></div>
           <span className="eyebrow">The email the merchant receives</span>

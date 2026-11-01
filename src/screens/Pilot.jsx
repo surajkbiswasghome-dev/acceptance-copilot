@@ -28,7 +28,7 @@ export default function Pilot({ role }) {
   const fromQueue = props.filter(p => ['interested', 'live'].includes(p.status)).map(p => p.merchantId).filter(m => !doc.cohort.includes(m));
   return (
     <>
-      <Head title="Pilot" sub="Run a small test and record the weekly numbers. The gates decide whether to scale, hold or pause." right={<span className="pill warn">You enter the results. Nothing here is a prediction.</span>} />
+      <Head help="pilot" title="Pilot" sub="Run a small test and record the weekly numbers. The gates decide whether to scale, hold or pause." right={<span className="pill warn">You enter the results. Nothing here is a prediction.</span>} />
       <section className="card"><div className="row between wrap"><div className="col" style={{ gap: 4 }}><span className="eyebrow">Status</span><span className={'pill ' + tag[0]} style={{ alignSelf: 'flex-start' }}>{tag[1]}</span></div>
         <div className="row">{doc.status === 'planned' || !doc.status ? <button className="btn pri" disabled={!edit || !doc.cohort.length} onClick={() => go('running', 'Pilot launched')}>Launch pilot</button> : doc.status === 'running' ? <button className="btn" disabled={!edit} onClick={() => go('paused', 'Pilot paused (kill-switch)')}>Pause pilot</button> : <button className="btn pri" disabled={!edit} onClick={() => go('running', 'Pilot resumed')}>Resume pilot</button>}</div></div>
         <span className="mute sm">{!doc.cohort.length ? 'Add merchants to the cohort first.' : edit ? 'Launching and pausing are logged. This prototype does not touch real payments.' : 'Only the Acceptance PM or Head can launch or pause.'}</span></section>

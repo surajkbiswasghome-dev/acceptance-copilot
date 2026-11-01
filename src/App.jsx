@@ -14,6 +14,7 @@ import Pilot from './screens/Pilot.jsx';
 import Brief from './screens/Brief.jsx';
 import Account from './screens/Account.jsx';
 import Login from './screens/Login.jsx';
+import { Welcome, Chat } from './Assistant.jsx';
 
 const LABEL = { insights: 'Insights', diagnose: 'Diagnose', explain: 'Explain', recommend: 'Recommend', proposals: 'Proposals', enable: 'Enablement', tickets: 'Tickets', pilot: 'Pilot', brief: 'Brief' };
 const SCREENS = { insights: Insights, diagnose: Diagnose, explain: Explain, recommend: Recommend, proposals: Proposals, enable: Enable, tickets: Tickets, pilot: Pilot, brief: Brief, account: Account };
@@ -23,11 +24,11 @@ export default function App() {
   const [user, setUser] = useKey('ac_user', null);
   const [theme, setTheme] = useKey('ac_theme', 'dark');
   const [open, setOpen] = useState(false); const [more, setMore] = useState(false);
-  const route = useRoute();
+  const route = useRoute(); const [welcome, setWelcome] = useState(() => { try { return !sessionStorage.getItem('ac_welcomed'); } catch { return true; } }); const [chatOpen, setChatOpen] = useState(false); const [seed, setSeed] = useState(null);
   useEffect(() => { document.documentElement.dataset.theme = theme; const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = theme === 'dark' ? '#0A1020' : '#F3F2ED'; }, [theme]);
   useEffect(() => { setOpen(false); setMore(false); window.scrollTo(0, 0); }, [route]);
   useEffect(() => { const f = () => { conn.setLocal(); setUser(null); location.hash = ''; }; addEventListener('ac-unauth', f); return () => removeEventListener('ac-unauth', f); }, []);
-  if (!user || !ROLES.some(r => r.id === user)) return <Login theme={theme} setTheme={setTheme} onLogin={r => { setUser(r.id); audit(r.name, 'Signed in', 'Workspace'); location.hash = '#/insights'; }} />;
+  if (!user || !ROLES.some(r => r.id === user)) return <Login theme={theme} setTheme={setTheme} onLogin={r => { try { sessionStorage.removeItem('ac_welcomed'); } catch {} setWelcome(true); setUser(r.id); audit(r.name, 'Signed in', 'Workspace'); location.hash = '#/insights'; }} />;
   const role = roleById(user);
   const signOut = () => { audit(role.name, 'Signed out', 'Workspace'); conn.setLocal(); setUser(null); location.hash = ''; };
   const allowed = route === 'account' || role.views.includes(route);
@@ -47,6 +48,8 @@ export default function App() {
         </div>
       </header>
       <main className="page fade" key={route}><Suspense fallback={<div className="mute">Loading…</div>}><Screen role={role} /></Suspense></main>
+      {welcome && <Welcome name={(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } })()} role={role} onClose={() => { try { sessionStorage.setItem('ac_welcomed', '1'); } catch {} setWelcome(false); }} onAsk={t => { try { sessionStorage.setItem('ac_welcomed', '1'); } catch {} setWelcome(false); setSeed({ text: t, n: Date.now() }); }} />}
+      <Chat role={role} open={chatOpen} setOpen={setChatOpen} seed={seed} />
       <nav className="bottom" aria-label="Views" style={{ gridTemplateColumns: `repeat(${bottom.length + (rest.length ? 1 : 0)},1fr)` }}>
         {bottom.map(k => <a key={k} href={'#/' + k} className={route === k ? 'on' : ''}>{LABEL[k]}</a>)}
         {rest.length > 0 && <a href="#" className={rest.includes(route) || route === 'account' ? 'on' : ''} onClick={e => { e.preventDefault(); setMore(!more); }}>More</a>}

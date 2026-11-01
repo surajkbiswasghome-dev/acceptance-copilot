@@ -93,7 +93,9 @@ export function offlineAgent(id) {
 }
 
 // Keyword routing for follow-up questions when Gemini is unavailable.
+import { inScope, OFF_TOPIC } from './guard.js';
 export function offlineAnswer(q) {
+  if (!inScope(q)) return { tool: 'guardrail', answer: OFF_TOPIC, guard: true };
   const s = q.toLowerCase();
   if (/issuer/.test(s)) { const r = runTool('issuer_split'); const t = top(r, 'issuerDeclineRate'); return { tool: 'issuer_split', answer: t.issuer + ' has the highest issuer-decline rate at ' + t.issuerDeclineRate + '% across n = ' + t.n + ' payments.' }; }
   if (/timeout|decline|reason/.test(s)) { const r = runTool('decline_breakdown', {}); return { tool: 'decline_breakdown', answer: 'Across all declines: ' + r.slice(0, 3).map(x => x.label.toLowerCase() + ' ' + x.share + '%').join(', ') + '.' }; }

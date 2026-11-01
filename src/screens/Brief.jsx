@@ -1,3 +1,4 @@
+import { speak as speakText, stopSpeech } from '../lib/speech.js';
 import React, { useState } from 'react';
 import { useColl, callApi, conn } from '../lib/db.js';
 import { buildBrief } from '../lib/brief.js';
@@ -6,12 +7,12 @@ import { Head } from '../ui.jsx';
 
 export default function Brief({ role }) {
   const tickets = useColl('tickets'), proposals = useColl('proposals'); const b = buildBrief(tickets, proposals);
-  const [speaking, setSpeaking] = useState(false); const [msg, setMsg] = useState(null); const [to, setTo] = useState(''); const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
-  const speak = () => { if (speaking) { speechSynthesis.cancel(); setSpeaking(false); return; } const u = new SpeechSynthesisUtterance(b.text); u.lang = 'en-IN'; u.rate = 0.98; u.onend = () => setSpeaking(false); setSpeaking(true); speechSynthesis.speak(u); };
+  const [speaking, setSpeaking] = useState(false); const [msg, setMsg] = useState(null); const [to, setTo] = useState(''); const canSpeak = true;
+  const speak = async () => { if (speaking) { stopSpeech(); setSpeaking(false); return; } setSpeaking(true); let n = 0; const parts = []; for (const t of b.text.split(/\n+/).filter(Boolean)) { if (n + t.length > 650) break; n += t.length; parts.push({ text: t, lang: 'en-IN' }); } await speakText(parts.length ? parts : [{ text: b.text.slice(0, 650), lang: 'en-IN' }], () => setSpeaking(false)); };
   const send = async ch => { setMsg(null); const r = await notify({ kind: 'brief', id: 'brief', to: ch === 'email' ? to.split(/[,;\s]+/).filter(x => x.includes('@')) : [], channels: { [ch]: true }, refId: 'brief' }); setMsg(r); };
   return (
     <>
-      <Head title="Morning brief" sub="What needs you today, in one place. Read it aloud, or send it to email or Telegram. A daily copy can go out automatically at 8:00 am." right={canSpeak && <button className="btn pri" onClick={speak}>{speaking ? 'Stop' : 'Read it aloud'}</button>} />
+      <Head help="brief" title="Morning brief" sub="What needs you today, in one place. Read it aloud, or send it to email or Telegram. A daily copy can go out automatically at 8:00 am." right={canSpeak && <button className="btn pri" onClick={speak}>{speaking ? 'Stop' : 'Read it aloud'}</button>} />
       <section className="card"><h2 style={{ fontSize: 22, letterSpacing: '-.02em' }}>{b.headline}</h2>
         {b.sections.map(s => <div key={s.title} className="col" style={{ gap: 6 }}><span className="eyebrow">{s.title}</span>{s.lines.map((l, i) => <div key={i}>{l}</div>)}</div>)}</section>
       <section className="card"><span className="eyebrow">Send it</span>

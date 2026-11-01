@@ -20,7 +20,8 @@ const seg = (pct, color, label) => `<td style="width:${Math.max(pct, 0.8)}%;back
 const stat = (big, small, note) => `<td style="width:33%;vertical-align:top;padding:0 8px 0 0"><div style="font-size:26px;font-weight:700;letter-spacing:-.03em;color:${INK}">${esc(big)}</div><div style="font-size:12px;line-height:1.45;color:${MUTE};margin-top:3px">${esc(small)}</div>${note ? `<div style="font-size:10.5px;color:#8A93A6;margin-top:3px">${esc(note)}</div>` : ''}</td>`;
 
 export function proposalEmail(p, urls) {
-  const m = S.MERCH[p.merchantId]; const inst = p.instruments[0]; const name = S.INST[inst]; const b = S.peerBenchmark(p.merchantId, inst); const pot = S.merchantPotential(p.merchantId);
+  const m = S.MERCH[p.merchantId]; const inst = p.instruments[0]; const name = S.instName(inst); const credit = inst === 5 || inst === 6; const ex = S.extraInst(inst); const b = typeof inst === 'number' ? S.peerBenchmark(p.merchantId, inst) : null; const pot = credit ? S.merchantPotential(p.merchantId) : null;
+  if (!credit) return genericProposal(p, m, name, ex, b, urls);
   const u = urls || { interested: '#interested', more: '#more', later: '#later' };
   const subject = `${m.name}: a way to complete more of your payments (${name}) [${p.id}]`;
   const mk = MARKET;
@@ -51,6 +52,24 @@ export function proposalEmail(p, urls) {
 
   <tr><td style="padding:18px 28px 26px"><div style="font-size:11px;color:#8A93A6;line-height:1.6;border-top:1px solid ${LINE};padding-top:12px">No commercial terms are included. The market figures are real and dated: ${esc(mk.upi.src)}; ${esc(mk.ru.src)}. The merchant and payment figures belong to a fictional demo merchant built on synthetic data, and the range is an illustration with the stated assumption, not a forecast.</div></td></tr>`, `${range} points potential on ${m.name}`);
   const text = `${m.name}: a way to complete more of your payments (${name}).\n\nIllustrative potential: ${range} percentage points on payment success (about ${pot.per1000[0]} to ${pot.per1000[1]} more completed payments per 1,000), assuming ${Math.round(S.POTENTIAL_ASSUMPTION.low * 100)}-${Math.round(S.POTENTIAL_ASSUMPTION.high * 100)}% of the ${pot.insPct}% insufficient-balance declines complete via a credit line. Not a forecast.\n\nMarket: UPI ${mk.upi.vol} payments in ${mk.upi.when} (${mk.upi.yoy} YoY, NPCI).\n\nInterested: ${u.interested}\nTell me more: ${u.more}\nNot now: ${u.later}`;
+  return { subject, html, text };
+}
+
+function genericProposal(p, m, name, ex, b, urls) {
+  const u = urls || { interested: '#interested', more: '#more', later: '#later' };
+  const subject = `${m.name}: adding ${name} [${p.id}]`;
+  const what = ex ? `${name} ${ex.what}.` : `${name} is a way for your customers to pay that you do not accept today.`;
+  const fit = ex ? `It is usually considered by ${ex.fit}.` : '';
+  const peers = b ? `${b.peers} of ${b.sameCategory} ${m.category.toLowerCase()} merchants in our sample already accept it, and it succeeds ${b.networkSuccess}% of the time across the network in that sample.` : '';
+  const html = wrap(`${head('Merchant growth proposal · ' + p.id)}
+  <tr><td style="padding:30px 28px 6px"><div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${ACC}">Prepared for ${esc(m.name)} · ${esc(m.category)}</div>
+  <div style="font-size:24px;font-weight:700;letter-spacing:-.025em;line-height:1.2;margin-top:8px">A proposal to add ${esc(name)}</div>
+  <p style="font-size:14px;line-height:1.6;color:${MUTE};margin:12px 0 0">${esc(what)} ${esc(fit)}</p></td></tr>
+  ${peers ? `<tr><td style="padding:18px 28px 4px">${sec('How peers use it')}<div style="font-size:14px;line-height:1.6">${esc(peers)}</div></td></tr>` : ''}
+  <tr><td style="padding:18px 28px 4px">${sec('What we have not claimed')}<div style="font-size:12.5px;line-height:1.65;color:${MUTE};border-left:3px solid ${LINE};padding-left:12px">We have not estimated a gain for this option, because the data we hold does not support a number. A short trial would measure the result with your own payments.</div></td></tr>
+  <tr><td style="padding:22px 28px 6px">${sec('Next step')}<div style="font-size:14px;line-height:1.6;margin-bottom:12px">One click tells us you would like to explore it. Nothing is switched on. We then confirm the technical steps with your acquirer and agree a small trial, with results reviewed together before anything wider.</div>${btn(u.interested, 'Yes, I would like to explore this', true)}${btn(u.more, 'Tell me more', false)}${btn(u.later, 'Not now', false)}</td></tr>
+  <tr><td style="padding:18px 28px 26px"><div style="font-size:11px;color:#8A93A6;line-height:1.6;border-top:1px solid ${LINE};padding-top:12px">No commercial terms are included. The merchant belongs to a fictional demo and the sample figures are synthetic.</div></td></tr>`, `Adding ${name} for ${m.name}`);
+  const text = `${m.name}: adding ${name}.\n\n${what} ${fit}\n${peers}\nNo gain has been estimated; a short trial would measure it. No commercial terms.\n\nInterested: ${u.interested}\nTell me more: ${u.more}\nNot now: ${u.later}`;
   return { subject, html, text };
 }
 

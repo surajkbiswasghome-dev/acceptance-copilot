@@ -1,3 +1,4 @@
+import { Info } from '../ui.jsx';
 import React, { useMemo, useState } from 'react';
 import * as S from '../lib/stats.js';
 import { Head, Seg, Bar, Gate } from '../ui.jsx';
@@ -16,13 +17,13 @@ export default function Diagnose() {
   const approvedCell = (ai, ii) => fnd.some(f => dec[f.id] === 'approved' && ((f.id === 'f1' && ai === f.acq && ii <= 1) || (f.id === 'f7' && f.au && ai === f.au.ai && ii === f.au.inst)));
   return (
     <>
-      <Head title="Diagnose" sub="Where payments leak across acquirers and instruments over the last 30 days. Every figure is computed from the data." right={<span className="pill">30 days · {k.n.toLocaleString('en-IN')} payments</span>} />
+      <Head help="diagnose" title="Diagnose" sub="Where payments leak across acquirers and instruments over the last 30 days. Every figure is computed from the data." right={<span className="pill">30 days · {k.n.toLocaleString('en-IN')} payments</span>} />
       <section className="grid4" aria-label="Key figures">
         {[['Overall success', k.success + '%', 'all instruments', k.success], ['UPI success', k.upiSuccess + '%', 'UPI bank and credit on UPI', k.upiSuccess], ['RuPay card success', k.rupaySuccess + '%', 'debit and credit', k.rupaySuccess], ['Value in declines', S.money(k.lostGmv), k.declines.toLocaleString('en-IN') + ' declined payments', 100 - (100 * k.lostGmv) / k.gmv]].map(([t, v, s, g]) => (
           <div className="card kpi" key={t}><span className="eyebrow">{t}</span><b className="num">{v}</b><Bar v={g} /><small>{s}</small></div>))}
       </section>
       <section className="card" aria-label="Heat map">
-        <div className="row between wrap"><div className="col" style={{ gap: 2 }}><span className="eyebrow">Acquirer × instrument</span><span className="mute sm">{lens === 'success' ? 'Success rate. Green 90%+, amber 87–90%, red below 87%. Cells under 20 payments show “low n”.' : 'Coverage: share of the acquirer’s merchants with the instrument enabled.'}</span></div><Seg value={lens} onChange={setLens} options={[['success', 'Success'], ['coverage', 'Coverage']]} /></div>
+        <div className="row between wrap"><div className="col" style={{ gap: 2 }}><span className="eyebrow">Acquirer × instrument<Info k="dg-matrix" /></span><span className="mute sm">{lens === 'success' ? 'Success rate. Green 90%+, amber 87–90%, red below 87%. Cells under 20 payments show “low n”.' : 'Coverage: share of the acquirer’s merchants with the instrument enabled.'}</span></div><Seg value={lens} onChange={setLens} options={[['success', 'Success'], ['coverage', 'Coverage']]} /></div>
         <div className="heatwrap"><div className="heat">
           <span />{S.INST.map(n => <span className="h" key={n}>{n}</span>)}
           {S.ACQ.map((a, ai) => (<React.Fragment key={a}><span className="h" style={{ alignItems: 'center' }}>{a}</span>
@@ -34,11 +35,11 @@ export default function Diagnose() {
           {matchId && <span className="mute sm" style={{ maxWidth: 360 }}>For RuPay the agent reads debit and credit together, so its figures can differ from this single cell.</span>}{matchId && dec[matchId] === 'approved' && <span className="pill ok">Approved · numbers change only after the pilot runs</span>}{matchId ? <a className="btn pri" style={{ display: 'inline-flex', alignItems: 'center' }} href={'#/explain?id=' + matchId}>Investigate with the agent</a> : <span className="mute sm">No flagged leak in this cell.</span>}
         </div>
       </section>
-      <section className="card" aria-label="Daily trend"><div className="row between wrap"><div className="col" style={{ gap: 2 }}><span className="eyebrow">Daily success rate</span><span className="mute sm">Dips show short incidents that a 30-day average hides.</span></div>
+      <section className="card" aria-label="Daily trend"><div className="row between wrap"><div className="col" style={{ gap: 2 }}><span className="eyebrow">Daily success rate<Info k="dg-daily" /></span><span className="mute sm">Dips show short incidents that a 30-day average hides.</span></div>
         <select style={{ width: 'auto', minHeight: 38 }} value={ta} onChange={e => setTa(+e.target.value)} aria-label="Acquirer"><option value={-1}>All acquirers</option>{S.ACQ.map((a, i) => <option key={a} value={i}>{a}</option>)}</select></div>
         <Trend series={S.dailySeries(t => ta < 0 || t.acq === ta)} /></section>
       <section className="grid2">
-        <div className="card"><span className="eyebrow">Ranked leaks</span>
+        <div className="card"><span className="eyebrow">Ranked leaks<Info k="dg-ranked" /></span>
           <div>{fnd.map((f, i) => (<a key={f.id} className="rank" href={'#/explain?id=' + f.id}><span className="n">{i + 1}</span><span className="col" style={{ gap: 2 }}><b>{f.title}</b><span className="mute sm">{f.subtitle}</span></span><span className="col" style={{ alignItems: 'flex-end', gap: 4 }}><Gate g={f.gate} />{dec[f.id] && <span className={'pill ' + (dec[f.id] === 'approved' ? 'ok' : 'bad')}>{dec[f.id] === 'approved' ? 'Approved · awaiting pilot' : 'Rejected'}</span>}</span></a>))}</div>
         </div>
         <div className="card"><span className="eyebrow">Why payments decline</span>
@@ -49,7 +50,7 @@ export default function Diagnose() {
         <div className="card"><div className="row between wrap"><span className="eyebrow">Instrument share by category</span>
           <select style={{ width: 'auto', minHeight: 38 }} value={inst} onChange={e => setInst(+e.target.value)} aria-label="Instrument">{S.INST.map((n, i) => <option key={n} value={i}>{n}</option>)}</select></div>
           <div className="col">{sc.map(c => <div key={c.category} className="col" style={{ gap: 4 }}><div className="row between sm"><span>{c.category}</span><span className="num mute">{c.share}% share · enabled {c.enabled}/{c.merchants}</span></div><Bar v={c.share} max={Math.max(5, ...sc.map(x => x.share))} /></div>)}</div></div>
-        <div className="card"><span className="eyebrow">Declines by issuer (top 5)</span>
+        <div className="card"><span className="eyebrow">Declines by issuer (top 5)<Info k="dg-issuer" /></span>
           <table><thead><tr><th>Issuer</th><th>Declines</th><th>Issuer-decline rate</th></tr></thead><tbody>{iss.map(r => <tr key={r.issuer}><td>{r.issuer}</td><td className="num">{r.declines}</td><td className="num">{r.issuerDeclineRate}%</td></tr>)}</tbody></table></div>
       </section>
       <section className="card" aria-label="Category by instrument"><span className="eyebrow">Share of payments: category × instrument</span>

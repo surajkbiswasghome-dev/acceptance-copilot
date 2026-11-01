@@ -16,7 +16,7 @@ export default function Recommend({ role }) {
   const create = async () => { const now = new Date().toISOString(); const id = uid('PRP'); await put('proposals', { id, merchantId: mi, instruments: insts, status: 'draft', created: now, ts: now, events: [{ ts: now, who: role.name, text: 'Draft created from recommendation' }] }); await audit(role.name, 'Created proposal', m.name, id); setMade(id); };
   return (
     <>
-      <Head title="Recommend" sub="For a merchant, what to enable and why, using what similar merchants on the network already see. It leads straight to a proposal." />
+      <Head help="recommend" title="Recommend" sub="For a merchant, what to enable and why, using what similar merchants on the network already see. It leads straight to a proposal." />
       <div className="row wrap"><span className="sm mute">Merchant</span>{presets.map(i => <button key={i} className={'btn' + (mi === i ? ' pri' : '')} style={{ minHeight: 38 }} onClick={() => { setMi(i); setMade(null); }}>{S.MERCH[i].category}</button>)}
         <select style={{ width: 'auto', minHeight: 38 }} value={mi} onChange={e => { setMi(+e.target.value); setMade(null); }} aria-label="Merchant">{S.MERCH.map((x, i) => <option key={i} value={i}>{x.name} · {x.category}</option>)}</select></div>
       <section className="card"><div className="col" style={{ gap: 2 }}><b style={{ fontSize: 20 }}>{m.name}</b><span className="mute sm">{m.category} · {m.segment} · {m.acquirer} · average ticket {money(p.avgTicket)} · {p.n} payments in 30 days · success {p.success}%</span></div>

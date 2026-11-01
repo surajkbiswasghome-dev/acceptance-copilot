@@ -5,7 +5,7 @@ import { Logo } from '../ui.jsx';
 import { matrix, statusOf } from '../lib/stats.js';
 import { useKey } from '../lib/store.js';
 export default function Login({ onLogin, theme, setTheme }) {
-  const [i, setI] = useState(0); const r = ROLES[i]; const [pw, setPw] = useState('demo-demo-demo'); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const [i, setI] = useState(0); const r = ROLES[i]; const [pw, setPw] = useState('demo-demo-demo'); const [nm, setNm] = useState(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } }); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const [, setStatus] = useKey('ac_status', null);
   const cells = matrix().flat().slice(0, 21);
   const go = async () => {
@@ -17,7 +17,7 @@ export default function Login({ onLogin, theme, setTheme }) {
       if (j.mode === 'server') conn.setServer(j.token); else conn.setLocal();
       setStatus(j.status || null);
     } catch { conn.setLocal(); setStatus(null); }
-    setBusy(false); onLogin(r);
+    try { localStorage.setItem('ac_name', nm.trim() || 'Suraj'); } catch {} setBusy(false); onLogin(r);
   };
   return (
     <div className="login">
@@ -33,6 +33,7 @@ export default function Login({ onLogin, theme, setTheme }) {
       <div className="r">
         <div className="row between"><div className="col" style={{ gap: 2 }}><h2 style={{ fontSize: 24, letterSpacing: '-.02em' }}>Sign in</h2><span className="mute sm">Choose a demo account</span></div><button className="btn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Ivory & Ink' : 'Midnight'}</button></div>
         <div className="col" role="group" aria-label="Demo accounts">{ROLES.map((x, k) => <button key={x.id} className={'role' + (k === i ? ' on' : '')} aria-pressed={k === i} onClick={() => setI(k)}><span className="av">{x.short}</span><span className="col" style={{ gap: 0 }}><b>{x.name}</b><span className="mute sm">{x.sub}</span></span></button>)}</div>
+        <label className="col" style={{ gap: 4 }}><span className="sm mute">Your name (for the welcome)</span><input type="text" value={nm} onChange={e => setNm(e.target.value)} /></label>
         <label className="col" style={{ gap: 4 }}><span className="sm mute">Email</span><input type="email" readOnly value={r.email} /></label>
         <label className="col" style={{ gap: 4 }}><span className="sm mute">Password</span><input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} /></label>
         {err && <div className="err sm">{err}</div>}

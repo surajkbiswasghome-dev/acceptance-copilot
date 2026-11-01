@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PieChart, Pie, Cell, Sector, ResponsiveContainer } from 'recharts';
-export const PALETTE = ['#5B8CFF', '#2DD4A7', '#F5B83D', '#FF6B7A', '#A78BFA', '#38BDF8', '#FB923C', '#94A3B8', '#E879F9', '#84CC16', '#F472B6'];
+export const PALETTE = ['#7C93C7', '#6FA8A0', '#C7A46A', '#C98790', '#9C92C2', '#7BA9C4', '#C79670', '#97A0B0', '#B88DB5', '#92AE6B', '#C98AA6'];
 export const AX = { fill: 'var(--mute)', fontSize: 12 };
 export const GRID = 'var(--line)';
 export const colorOf = i => PALETTE[i % PALETTE.length];

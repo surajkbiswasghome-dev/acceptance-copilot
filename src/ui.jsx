@@ -4,7 +4,7 @@ export const Spark = () => (<svg width="12" height="12" viewBox="0 0 16 16" fill
 export const AiTag = () => <span className="pill"><Spark />AI suggestion</span>;
 export const Tick = () => (<span className="tick" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3.6 8.4l2.8 2.8 6-6.4" /></svg></span>);
 export const Gate = ({ g }) => <span className={'pill ' + (g === 'Experience' ? 'warn' : g === 'Coverage' || g === 'Enablement' ? 'ok' : '')}>{g}</span>;
-export const Head = ({ title, sub, right }) => (<div className="row between wrap"><div className="pagehead"><h1>{title}</h1>{sub && <p>{sub}</p>}</div>{right}</div>);
+export const Head = ({ title, sub, right, help }) => (<div className="row between wrap"><div className="pagehead"><h1>{title}{help && <Info k={help} />}</h1>{sub && <p>{sub}</p>}</div>{right}</div>);
 export const Seg = ({ value, onChange, options }) => (<div className="seg" role="group">{options.map(o => <button key={o[0]} className={value === o[0] ? 'on' : ''} aria-pressed={value === o[0]} onClick={() => onChange(o[0])}>{o[1]}</button>)}</div>);
 export const Bar = ({ v, max = 100 }) => <div className="bar"><i style={{ width: Math.min(100, (100 * v) / max) + '%' }} /></div>;
 export const Mic = ({ onText }) => {
@@ -26,4 +26,29 @@ export function ChipInput({ value, onChange, placeholder, label }) {
     {value.map(v => <span key={v} className={'chip' + (isEmail(v) ? '' : ' bad')}>{v}<button type="button" aria-label={'Remove ' + v} onClick={() => onChange(value.filter(x => x !== v))}>×</button></span>)}
     <input type="text" inputMode="email" value={draft} placeholder={value.length ? '' : placeholder} onChange={e => { const v = e.target.value; if (/[,;\s]$/.test(v)) add(v); else setDraft(v); }} onKeyDown={key} onBlur={() => add(draft)} onPaste={e => { const t = e.clipboardData.getData('text'); if (/[,;\s]/.test(t.trim())) { e.preventDefault(); add(t); } }} />
   </div></label>);
+}
+
+// Small "i" button. Hover, focus or tap shows what a section is for.
+import { HELP } from './lib/help.js';
+export function Info({ k, text }) {
+  const [open, setOpen] = React.useState(false); const t = text || HELP[k]; if (!t) return null;
+  return (<span className="info" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}><button type="button" aria-label="What is this?" aria-expanded={open} onClick={e => { e.stopPropagation(); setOpen(o => !o); }} onBlur={() => setOpen(false)}>i</button>{open && <span role="tooltip" className="infotip">{t}</span>}</span>);
+}
+// Renders children only once scrolled into view, so chart animations play when the reader arrives.
+export function Reveal({ children, h = 240 }) {
+  const ref = React.useRef(null); const [on, setOn] = React.useState(false);
+  React.useEffect(() => { const el = ref.current; if (!el || on) return; if (typeof IntersectionObserver === 'undefined') { setOn(true); return; } const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { setOn(true); io.disconnect(); } }, { threshold: 0.25 }); io.observe(el); return () => io.disconnect(); }, [on]);
+  return <div ref={ref} style={{ minHeight: on ? undefined : h }}>{on ? children : null}</div>;
+}
+// Type to find a merchant. Partial names float the right choice to the top.
+export function MerchantPicker({ merchants, value, onChange, allLabel = 'Whole portfolio' }) {
+  const [q, setQ] = React.useState(''); const [open, setOpen] = React.useState(false);
+  const cur = value === '' || value == null ? null : merchants[value];
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+  const list = merchants.map((m, i) => ({ m, i })).filter(({ m }) => !q.trim() || norm(m.name + ' ' + m.category).includes(norm(q.trim()))).sort((a, b) => (norm(a.m.name).startsWith(norm(q.trim())) ? 0 : 1) - (norm(b.m.name).startsWith(norm(q.trim())) ? 0 : 1)).slice(0, 8);
+  const pick = i => { onChange(i); setQ(''); setOpen(false); };
+  return (<div className="mpick"><div className="chips" onClick={() => setOpen(true)} style={{ minHeight: 40 }}>
+    {cur ? <span className="chip">{cur.name}<button type="button" aria-label="Clear merchant" onClick={e => { e.stopPropagation(); pick(''); }}>×</button></span> : <span className="mute sm" style={{ paddingLeft: 4 }}>{allLabel}</span>}
+    <input type="text" value={q} placeholder={cur ? '' : 'Type a merchant name'} aria-label="Find a merchant" onFocus={() => setOpen(true)} onChange={e => { setQ(e.target.value); setOpen(true); }} onBlur={() => setTimeout(() => setOpen(false), 150)} onKeyDown={e => { if (e.key === 'Enter' && list[0]) { e.preventDefault(); pick(list[0].i); } if (e.key === 'Escape') { setQ(''); setOpen(false); } }} /></div>
+    {open && <div className="mlist" role="listbox"><button type="button" onMouseDown={e => e.preventDefault()} onClick={() => pick('')}><b>{allLabel}</b></button>{list.map(({ m, i }) => <button type="button" key={i} onMouseDown={e => e.preventDefault()} onClick={() => pick(i)}><b>{m.name}</b><small>{m.category}</small></button>)}{list.length === 0 && <span className="mute sm" style={{ padding: 10 }}>No merchant matches “{q}”.</span>}</div>}</div>);
 }
