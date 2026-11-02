@@ -7,10 +7,10 @@ import { conn, load, getAll } from '../lib/db.js';
 import { LANGS, DEFAULT_LANG } from '../lib/lang.js';
 import { useKey } from '../lib/store.js';
 export default function Login({ onLogin, theme, setTheme }) {
-  const [i, setI] = useState(0); const r = ROLES[i]; const [pw, setPw] = useState('demo-demo-demo'); const [nm, setNm] = useState(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } }); const [lang, setLang] = useState({}); const L = lang[r.id] || (() => { try { return localStorage.getItem('ac_lang_' + r.id); } catch { return null; } })() || DEFAULT_LANG[r.id] || 'en'; const [steps, setSteps] = useState(null); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const [i, setI] = useState(0); const r = ROLES[i]; const [pw, setPw] = useState('demo-demo-demo'); const [nm, setNm] = useState(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } }); const [lang, setLang] = useState({}); const L = lang[r.id] || (() => { try { return localStorage.getItem('ac_lang_' + r.id); } catch { return null; } })() || DEFAULT_LANG[r.id] || 'en'; const [greet, setGreet] = useState(() => { try { return localStorage.getItem('ac_greet') !== 'off'; } catch { return true; } }); const [steps, setSteps] = useState(null); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const [, setStatus] = useKey('ac_status', null);
     const go = async () => {
-    setBusy(true); setErr(''); const S3 = (a, b, c) => setSteps([['Signing you in', a], ['Loading your workspace', b], ['Preparing your welcome voice', c]]); S3('run', 'todo', 'todo');
+    setBusy(true); setErr(''); const S3 = (a, b, c) => setSteps([['Signing you in', a], ['Loading your workspace', b], ...(greet ? [['Preparing your welcome voice', c]] : [])]); S3('run', 'todo', 'todo');
     try {
       const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: r.email, password: pw }) });
       if (res.status === 401) { setErr('Wrong password for this workspace.'); setBusy(false); setSteps(null); return; }
@@ -18,12 +18,12 @@ export default function Login({ onLogin, theme, setTheme }) {
       if (j.mode === 'server') conn.setServer(j.token); else conn.setLocal();
       setStatus(j.status || null);
     } catch { conn.setLocal(); setStatus(null); }
-    try { localStorage.setItem('ac_name', nm.trim() || 'Suraj'); localStorage.setItem('ac_lang_' + r.id, L); sessionStorage.setItem('ac_welcome_lang', L); } catch {}
+    try { localStorage.setItem('ac_name', nm.trim() || 'Suraj'); localStorage.setItem('ac_lang_' + r.id, L); sessionStorage.setItem('ac_welcome_lang', L); localStorage.setItem('ac_greet', greet ? 'on' : 'off'); } catch {}
     S3('done', 'run', 'todo'); try { await Promise.all(['decisions', 'tickets', 'proposals'].map(load)); } catch {}
     // Make the welcome voice now, while the infographics play, so it is ready the moment the workspace opens.
     S3('done', 'done', 'run');
-    try { const [{ welcomeLines }, { LANGS: LG }] = await Promise.all([import('../lib/assistant.js'), import('../lib/lang.js')]); const w = welcomeLines(nm.trim() || 'Suraj', { decisions: getAll('decisions'), tickets: getAll('tickets'), proposals: getAll('proposals') }, new Date(), L); await prepareVoice(w.parts.map(p => p.text).join(' '), LG.find(x => x.id === L).tag, 14000); } catch {}
-    S3('done', 'done', 'done'); await new Promise(x => setTimeout(x, 350)); setBusy(false); setSteps(null); onLogin(r);
+    if (greet) try { const [{ welcomeLines }, { LANGS: LG }] = await Promise.all([import('../lib/assistant.js'), import('../lib/lang.js')]); const w = welcomeLines(nm.trim() || 'Suraj', { decisions: getAll('decisions'), tickets: getAll('tickets'), proposals: getAll('proposals') }, new Date(), L); await prepareVoice(w.parts.map(p => p.text).join(' '), LG.find(x => x.id === L).tag, 14000); } catch {}
+    S3('done', 'done', 'done'); await new Promise(x => setTimeout(x, 350)); setBusy(false); setSteps(null); onLogin(r, greet);
   };
   return (
     <div className="login">
@@ -46,6 +46,7 @@ export default function Login({ onLogin, theme, setTheme }) {
           <label className="col" style={{ gap: 4 }}><span className="sm mute">Email</span><input type="email" readOnly value={r.email} /></label>
         </div>
         <div className="col" style={{ gap: 6 }} role="radiogroup" aria-label="Welcome language"><span className="sm mute">Welcome message language (the rest stays in English)</span><div className="row wrap" style={{ gap: 8 }}>{LANGS.map(x => <label key={x.id} className="row sm" style={{ gap: 6, border: '1px solid var(--line)', borderRadius: 999, padding: '5px 12px', background: L === x.id ? 'color-mix(in srgb, var(--acc) 18%, var(--s1))' : 'transparent', cursor: 'pointer' }}><input type="radio" name="wl" checked={L === x.id} onChange={() => setLang(v => ({ ...v, [r.id]: x.id }))} />{x.label}</label>)}</div></div>
+        <label className="row between" style={{ gap: 10, cursor: 'pointer' }}><span className="col" style={{ gap: 0 }}><b className="sm">Play the welcome greeting</b><span className="sm mute">{greet ? 'On: a spoken welcome with pending items opens after sign-in.' : 'Off: goes straight to the workspace, no voice, no pop-up.'}</span></span><input type="checkbox" role="switch" aria-label="Play the welcome greeting" checked={greet} onChange={e => setGreet(e.target.checked)} style={{ width: 44, height: 24, accentColor: 'var(--acc)', flex: 'none' }} /></label>
         <label className="col" style={{ gap: 4 }}><span className="sm mute">Password</span><input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} /></label>
         {err && <div className="err sm">{err}</div>}
         <button className="btn pri" style={{ minHeight: 48, fontSize: 16 }} disabled={busy} onClick={go}>{busy ? 'Signing in…' : 'Continue to workspace'}</button>

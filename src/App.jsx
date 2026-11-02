@@ -30,7 +30,7 @@ export default function App() {
   useEffect(() => { document.documentElement.dataset.theme = theme; const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = theme === 'dark' ? '#0A1020' : '#F3F2ED'; }, [theme]);
   useEffect(() => { setOpen(false); setMore(false); window.scrollTo(0, 0); }, [route]);
   useEffect(() => { const f = () => { conn.setLocal(); setUser(null); location.hash = ''; }; addEventListener('ac-unauth', f); return () => removeEventListener('ac-unauth', f); }, []);
-  if (!user || !ROLES.some(r => r.id === user)) return <Login theme={theme} setTheme={setTheme} onLogin={r => { try { sessionStorage.removeItem('ac_welcomed'); } catch {} setWelcome(true); setUser(r.id); audit(r.name, 'Signed in', 'Workspace'); location.hash = '#/insights'; }} />;
+  if (!user || !ROLES.some(r => r.id === user)) return <Login theme={theme} setTheme={setTheme} onLogin={(r, g) => { try { g === false ? sessionStorage.setItem('ac_welcomed', '1') : sessionStorage.removeItem('ac_welcomed'); } catch {} setWelcome(g !== false); setUser(r.id); audit(r.name, 'Signed in', 'Workspace'); location.hash = '#/insights'; }} />;
   const role = roleById(user);
   const signOut = () => { audit(role.name, 'Signed out', 'Workspace'); conn.setLocal(); setUser(null); location.hash = ''; };
   const allowed = route === 'account' || role.views.includes(route);

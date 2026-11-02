@@ -143,3 +143,5 @@ table{border-collapse:collapse;width:100%;font-size:14px}th{text-align:left;font
 @media(max-width:1500px){.nav a{padding:8px 9px;font-size:13.5px}.nav{gap:2px}}
 .top .spacer{flex:0 0 0;width:0}.nav{flex:1 1 auto}
 @media(max-width:1320px){.nav a{padding:8px 7px;font-size:13px}}
+@media(max-width:900px){.login{grid-template-columns:minmax(0,1fr)}.login .r,.login .l{min-width:0}.login .r input[type=text],.login .r input[type=email],.login .r input[type=password]{width:100%;box-sizing:border-box;min-width:0}.login .r .col,.login .r .row{min-width:0}}
+@media(max-width:900px){.roles{grid-template-columns:repeat(2,minmax(0,1fr))!important}.roles>*{min-width:0}.roles small,.roles span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
