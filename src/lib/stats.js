@@ -254,3 +254,62 @@ export function creditFit(mi, inst) {
 export function topCreditCandidates(limit = 5) {
   return MERCH.map((m, i) => i).filter(i => (!MERCH[i].enabled[5] || !MERCH[i].enabled[6]) && TX.filter(t => t.m === i).length >= 150).map(i => { const pot = merchantPotential(i); const inst = !MERCH[i].enabled[6] ? 6 : 5; const f = creditFit(i, inst); return { mi: i, inst, name: MERCH[i].name, category: MERCH[i].category, n: pot.n, insPct: pot.insPct, pot, verdict: f.verdict, score: f.score, outOf: f.outOf, pool: Math.round(pot.n * pot.insPct / 100) }; }).sort((a, b) => b.pool - a.pool).slice(0, limit);
 }
+
+// ---- Merchant targeting: which merchants are most likely to add credit-on-UPI sales ----
+// A weighted scoring model with fixed, visible weights. It is not a trained model: training needs real pilot outcomes as labels.
+// Factors from the planning list that this dataset cannot support are named in TARGET_NOT_USED, never guessed.
+export const TARGET_FACTORS = [
+  { id: 'ins', label: 'Declined for insufficient balance', w: 30, why: 'The pool a credit line can complete. The most direct signal.' },
+  { id: 'tpv', label: 'Merchant TPV (30 days)', w: 15, why: 'More sales means more absolute upside.' },
+  { id: 'tkt', label: 'Average ticket', w: 15, why: 'Affordability matters more at higher tickets.' },
+  { id: 'cat', label: 'Category (MCC group)', w: 10, why: 'Electronics, travel, education, healthcare and home improvement are the target clusters.' },
+  { id: 'upi', label: 'UPI share of payments', w: 10, why: 'Customers already comfortable paying on UPI.' },
+  { id: 'crd', label: 'Card share of payments', w: 10, why: 'Stand-in for credit-card penetration: customers who hold cards.' },
+  { id: 'gro', label: 'Growth (second half vs first half)', w: 10, why: 'Merchants that are growing absorb new options faster.' }
+];
+export const TARGET_NOT_USED = [
+  { label: 'Customer demographics', why: 'Not in the dataset, and would need consent and PII controls with real data.' },
+  { label: 'Location', why: 'The synthetic merchants carry no city or region.' },
+  { label: 'Repeat customer %', why: 'Payments carry no customer identifier.' }
+];
+let _tc = null;
+function targetTable() {
+  if (_tc) return _tc;
+  const raw = MERCH.map((m, mi) => {
+    const r = TX.filter(t => t.m === mi); const n = r.length || 1; const first = r.filter(t => t.day < 15).length, second = r.length - first;
+    return { mi, n: r.length, ins: 100 * r.filter(t => t.st === 3).length / n, tpv: r.reduce((a, t) => a + t.amt, 0), tkt: r.reduce((a, t) => a + t.amt, 0) / n, cat: HIGH_VALUE_CATS.includes(m.category) ? 1 : 0, upi: 100 * r.filter(t => t.inst >= 4 && t.inst <= 6).length / n, crd: 100 * r.filter(t => t.inst >= 1 && t.inst <= 3).length / n, gro: first ? 100 * (second - first) / first : 0 };
+  });
+  const rank = id => { const v = raw.map(x => x[id]); const mn = Math.min(...v), mx = Math.max(...v); return raw.map(x => (mx === mn ? 0.5 : (x[id] - mn) / (mx - mn))); };
+  const nr = Object.fromEntries(TARGET_FACTORS.map(f => [f.id, rank(f.id)]));
+  _tc = raw.map((x, i) => { const parts = TARGET_FACTORS.map(f => ({ ...f, value: x[f.id], pts: Math.round(f.w * nr[f.id][i] * 10) / 10 })); return { ...x, parts, score: Math.round(parts.reduce((a, p) => a + p.pts, 0)) }; });
+  return _tc;
+}
+export function targetScore(mi) { const t = targetTable()[mi]; const band = t.score >= 60 ? 'High' : t.score >= 40 ? 'Medium' : 'Low'; return { ...t, band, eligible: !MERCH[mi].enabled[5] || !MERCH[mi].enabled[6], enoughData: t.n >= 150 }; }
+export function targetRanking(limit = 8) { return MERCH.map((m, mi) => targetScore(mi)).filter(t => t.eligible && t.enoughData).sort((a, b) => b.score - a.score).slice(0, limit); }
+
+// ---- Pre-route decision: choose the better path per issuer where more than one acquirer already carries that issuer ----
+export function preRouteDecisions(instFilter = () => true, minN = 25) {
+  const out = [];
+  ISS.forEach((issuer, ii) => {
+    const per = ACQ.map((acq, ai) => { const r = TX.filter(t => t.iss === ii && t.acq === ai && instFilter(t.inst)); const lat = r.map(t => t.lat).sort((a, b) => a - b); return { acq, ai, n: r.length, approval: rate(r), p50: lat.length ? lat[Math.floor(lat.length / 2)] : null }; }).filter(x => x.n >= minN);
+    if (per.length < 2) return;
+    const total = per.reduce((a, x) => a + x.n, 0); const cur = [...per].sort((a, b) => b.n - a.n)[0];
+    const best = [...per].sort((a, b) => b.approval - a.approval || a.p50 - b.p50)[0];
+    const slow = per.filter(x => x.p50 > 1.4 * Math.min(...per.map(y => y.p50)));
+    out.push({ issuer, n: total, current: cur, best, gain: r1(best.approval - cur.approval), switch: best.ai !== cur.ai && best.approval - cur.approval >= 2, slow: slow.map(x => x.acq), paths: per });
+  });
+  return out.sort((a, b) => b.gain - a.gain);
+}
+
+// ---- Risk triage preview: Allow / Monitor / Step-up / Decline, using only the signals this dataset carries ----
+export const RISK_USED = ['Unusual ticket (against the merchant’s own average)', 'Merchant risk (share of its payments stopped for risk)', 'Issuer authentication failure rate'];
+export const RISK_NOT_USED = ['New device', 'Velocity', 'Geo anomaly', 'Account age', 'Credit-line utilisation', 'Historical disputes'];
+export function riskTriage(rows = TX) {
+  const mrisk = MERCH.map((m, mi) => { const r = TX.filter(t => t.m === mi); return r.length ? r.filter(t => t.st === 5).length / r.length : 0; });
+  const iauth = ISS.map((x, ii) => { const r = TX.filter(t => t.iss === ii); return r.length ? r.filter(t => t.st === 4).length / r.length : 0; });
+  const mavg = MERCH.map((m, mi) => { const r = TX.filter(t => t.m === mi); return r.length ? r.reduce((a, t) => a + t.amt, 0) / r.length : 1; });
+  const mr = [...mrisk].sort((a, b) => b - a)[Math.floor(MERCH.length * 0.15)], ir = [...iauth].sort((a, b) => b - a)[Math.floor(ISS.length * 0.2)];
+  const act = { Allow: 0, Monitor: 0, 'Step-up': 0, Decline: 0 };
+  rows.forEach(t => { const f = (t.amt > 3 * mavg[t.m] ? 1 : 0) + (mrisk[t.m] >= mr && mrisk[t.m] > 0 ? 1 : 0) + (iauth[t.iss] >= ir && iauth[t.iss] > 0 ? 1 : 0); act[f === 0 ? 'Allow' : f === 1 ? 'Monitor' : f === 2 ? 'Step-up' : 'Decline']++; });
+  return { n: rows.length, act };
+}

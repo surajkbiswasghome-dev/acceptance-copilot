@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Head } from '../ui.jsx';
 import { AGENTS, GUARDRAILS, runEvals } from '../lib/agents.js';
+import * as S from '../lib/stats.js';
 
 const tone = s => (s.startsWith('Live') || s === 'Implemented' ? 'ok' : s.startsWith('Built') ? 'warn' : '');
 const missed = () => { try { return JSON.parse(localStorage.getItem('ac_unanswered') || '[]'); } catch { return []; } };
@@ -27,6 +28,9 @@ export default function Agents() {
             {a.next && <div className="col" style={{ gap: 2 }}><span className="eyebrow">Next</span><span className="sm">{a.next}</span></div>}
           </div>}
         </div>); })}</div></section>
+    <section className="card"><div className="row between wrap"><span className="eyebrow">Risk triage preview · nothing is blocked</span><span className="pill">Uses 3 of 9 signals</span></div>
+      {(() => { const r = S.riskTriage(); return <div className="grid4">{Object.entries(r.act).map(([k, v]) => <div key={k} className="kt"><small>{k}</small><b className="num">{v.toLocaleString('en-IN')}</b><span className="mute sm">{(100 * v / r.n).toFixed(1)}% of payments</span></div>)}</div>; })()}
+      <span className="sm"><b>Used:</b> {S.RISK_USED.join('; ')}.</span><span className="sm"><b>Needed, not in this data:</b> {S.RISK_NOT_USED.join(', ')}.</span><span className="mute sm">A payment with none of the three signals is allowed, one signal is monitored, two need step-up, three would be declined. Synthetic data and simple rules: a demonstration of the decision shape, to be built with fraud-risk and compliance.</span></section>
     <section className="card"><span className="eyebrow">Guardrails across the platform</span>
       {groups.map(g => <div key={g} className="col" style={{ gap: 6 }}><b>{g}</b><table><tbody>{GUARDRAILS.filter(x => x.group === g).map(x => <tr key={x.id}><td style={{ width: 96 }}><span className={'pill ' + tone(x.status)}>{x.status}</span></td><td><b>{x.name}</b><div className="mute sm">{x.how}{x.where ? ' · ' + x.where : ''}</div></td></tr>)}</tbody></table></div>)}</section>
     <section className="card"><span className="eyebrow">Checked on every build, outside the app</span><p className="mute sm" style={{ margin: 0 }}>Unit tests on the data, the questions, the welcome and the proposals, plus end-to-end checks of email, Telegram, call preview, roles and four-eyes approval run before each release. They are run by the team, not from this screen.</p></section>

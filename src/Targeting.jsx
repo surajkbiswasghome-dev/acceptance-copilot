@@ -1,0 +1,10 @@
+import React from 'react';
+import * as S from './lib/stats.js';
+
+export function Targeting({ mi, onPick }) {
+  const top = S.targetRanking(6); const sel = S.targetScore(mi); const tone = { High: 'ok', Medium: 'warn', Low: '' };
+  return (<section className="card" aria-label="Merchant targeting"><div className="row between wrap"><div className="col" style={{ gap: 2 }}><span className="eyebrow">Merchant targeting · AI suggestion</span><b style={{ fontSize: 18 }}>Who is most likely to add credit-on-UPI sales</b></div><span className="pill">Weighted scoring, not a trained model</span></div>
+    <div className="grid2e"><div style={{ overflowX: 'auto' }}><table><thead><tr><th>Merchant</th><th>Score</th><th>Likelihood</th><th>Declined: balance</th></tr></thead><tbody>{top.map(t => <tr key={t.mi} className="tr" onClick={() => onPick && onPick(t.mi)} style={t.mi === mi ? { outline: '2px solid var(--acc)' } : null}><td><b>{S.MERCH[t.mi].showcase ? '★ ' : ''}{S.MERCH[t.mi].name}</b><div className="mute sm">{S.MERCH[t.mi].category}</div></td><td className="num"><b>{t.score}</b> / 100</td><td><span className={'pill ' + tone[t.band]}>{t.band}</span></td><td className="num">{t.ins.toFixed(1)}%</td></tr>)}</tbody></table></div>
+      <div className="insight col" style={{ gap: 6 }}><b>{S.MERCH[mi].name}: {sel.score} / 100, {sel.band.toLowerCase()} likelihood</b>{sel.parts.map(p => <div key={p.id} className="col" style={{ gap: 2 }}><div className="row between sm"><span title={p.why}>{p.label}</span><b className="num">{p.pts} of {p.w}</b></div><div style={{ height: 6, borderRadius: 3, background: 'var(--line)' }}><div style={{ height: 6, borderRadius: 3, width: (100 * p.pts / p.w) + '%', background: 'var(--acc)' }} /></div></div>)}</div></div>
+    <span className="mute sm">Not used, because the data cannot support them: {S.TARGET_NOT_USED.map(x => x.label.toLowerCase()).join('; ')}. Scores compare merchants with each other on synthetic data. Once a pilot produces real outcomes, a trained model can replace the weights and be compared against this baseline.</span></section>);
+}
