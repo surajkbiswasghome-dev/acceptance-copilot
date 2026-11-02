@@ -1,7 +1,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import * as S from '../src/lib/stats.js'; import { offlineAgent, runTool, offlineAnswer } from '../src/lib/agent.js';
-test('dataset size', () => { assert.equal(S.TX.length, 5880); assert.equal(S.MERCH.length, 40); });
-test('kpis consistent', () => { const k = S.kpis(); assert.equal(k.n, 5880); assert.ok(k.success > 85 && k.success < 95); assert.equal(k.declines, S.TX.filter(t => !t.ok).length); });
+test('dataset size', () => { assert.equal(S.TX.length, 6560); assert.equal(S.MERCH.length, 42); });
+test('kpis consistent', () => { const k = S.kpis(); assert.equal(k.n, 6560); assert.ok(k.success > 85 && k.success < 95); assert.equal(k.declines, S.TX.filter(t => !t.ok).length); });
 test('pattern 1 surfaces as top leak', () => { const f = S.findings()[0]; assert.match(f.title, /Acquirer C/); assert.ok(f.gap < -4); });
 test('pattern 3 issuer 07', () => assert.match(S.findings()[1].title, /Issuer 07/));
 test('pattern 2 and 4 present', () => { const f = S.findings(); assert.ok(f[2].etShare < f[2].restShare / 2); assert.ok(f[3].ts.high.share < f[3].ts.low.share / 2); });
@@ -13,7 +13,7 @@ test('simulation is a difference in success, not a gross count', () => { const m
 test('finding 1 labels the combined cut', () => assert.match(S.findings()[0].subtitle, /debit \+ credit combined/));
 test('unknown tool safe', () => assert.ok(runTool('nope').error));
 test('followup routes', () => { const a = offlineAnswer('which issuer is worst?'); assert.equal(a.tool, 'data_query'); assert.match(a.answer, /Issuer/); });
-test('recommend returns for all merchants', () => { for (let i = 0; i < 40; i++) assert.ok(S.recommend(i).profile); });
+test('recommend returns for all merchants', () => { for (let i = 0; i < S.MERCH.length; i++) assert.ok(S.recommend(i).profile); });
 test('agent endpoint offline path', async () => { delete process.env.GEMINI_API_KEY; const h = (await import('../api/agent.js')).default; let out; await h({ body: { id: 'f1' } }, { setHeader() {}, status() { return { json: v => (out = v) }; } }); assert.equal(out.mode, 'offline'); assert.ok(out.finding.action); });
 
 import * as A from '../src/lib/analytics.js';
@@ -42,3 +42,20 @@ test('welcome speaks the chosen language and the right part of the day', () => {
 
 import { runEvals, AGENTS, GUARDRAILS } from '../src/lib/agents.js';
 test('every live eval passes and every agent guardrail exists', () => { const r = runEvals(); const bad = r.filter(x => !x.pass); assert.deepEqual(bad.map(x => x.id + ': ' + x.detail), []); const ids = new Set(GUARDRAILS.map(g => g.id)); for (const a of AGENTS) for (const g of a.guard) assert.ok(ids.has(g), a.id + ' -> ' + g); });
+
+test('credit-on-UPI showcase merchants and fit check', async () => {
+  const S = await import('../src/lib/stats.js');
+  assert.ok(S.SHOWCASE.length >= 2);
+  for (const mi of S.SHOWCASE) {
+    const m = S.MERCH[mi]; assert.ok(!m.enabled[5] && !m.enabled[6]);
+    assert.ok(S.TX.filter(t => t.m === mi).length >= 300);
+    const f = S.creditFit(mi, 6); assert.equal(f.verdict, 'Strong fit'); assert.ok(f.pot.highPts > 0.5);
+  }
+  assert.equal(S.MERCH_ORDER[0], S.SHOWCASE[0]);
+  assert.deepEqual(S.topCreditCandidates(2).map(c => c.mi).sort(), [...S.SHOWCASE].sort());
+});
+test('copilot names credit-on-UPI candidates', async () => {
+  const { reply } = await import('../src/lib/assistant.js');
+  const r = reply('Which merchants should I show for credit line on UPI?', { proposals: [] }, { name: 'Priya' }, 'proposals');
+  assert.match(r.text, /Aurora Appliances/); assert.match(r.text, /Summit Holidays/);
+});

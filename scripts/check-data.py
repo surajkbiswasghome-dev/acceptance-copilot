@@ -9,7 +9,7 @@ def check(name, cond, detail):
     print(('PASS ' if cond else 'FAIL ') + name + ' :: ' + detail)
     if not cond: fails.append(name)
 print('transactions', len(T), 'merchants', len(M))
-check('size', 5500 <= len(T) <= 6300 and len(M) == 40, f'{len(T)} tx, {len(M)} merchants')
+check('size', 5500 <= len(T) <= 6800 and len(M) == 42, f'{len(T)} tx, {len(M)} merchants')
 # 1: Acquirer C RuPay gap
 c = [r for r in T if r[2] == 2 and r[3] <= 1]; p = [r for r in T if r[2] != 2 and r[3] <= 1]
 gap = rate(p) - rate(c)

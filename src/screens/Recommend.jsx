@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
+import { FitMatrix } from '../FitMatrix.jsx';
 import * as S from '../lib/stats.js';
 import { useColl, put, audit, uid } from '../lib/db.js';
 import { Head, Gate } from '../ui.jsx';
 
-const presets = ['Electronics', 'Travel', 'Grocery'].map(c => S.MERCH.findIndex(m => m.category === c));
+const presets = [...S.SHOWCASE, ...['Grocery'].map(c => S.MERCH.findIndex(m => m.category === c))];
 const money = v => (v == null ? '–' : '₹' + Math.round(v).toLocaleString('en-IN'));
 export default function Recommend({ role }) {
   const [mi, setMi] = useState(presets[0]); const props = useColl('proposals'); const [made, setMade] = useState(null);
@@ -17,10 +18,11 @@ export default function Recommend({ role }) {
   return (
     <>
       <Head help="recommend" title="Recommend" sub="For a merchant, what to enable and why, using what similar merchants on the network already see. It leads straight to a proposal." />
-      <div className="row wrap"><span className="sm mute">Merchant</span>{presets.map(i => <button key={i} className={'btn' + (mi === i ? ' pri' : '')} style={{ minHeight: 38 }} onClick={() => { setMi(i); setMade(null); }}>{S.MERCH[i].category}</button>)}
-        <select style={{ width: 'auto', minHeight: 38 }} value={mi} onChange={e => { setMi(+e.target.value); setMade(null); }} aria-label="Merchant">{S.MERCH.map((x, i) => <option key={i} value={i}>{x.name} · {x.category}</option>)}</select></div>
+      <div className="row wrap"><span className="sm mute">Merchant</span>{presets.map(i => <button key={i} className={'btn' + (mi === i ? ' pri' : '')} style={{ minHeight: 38 }} onClick={() => { setMi(i); setMade(null); }}>{S.MERCH[i].showcase ? '★ ' + S.MERCH[i].name : S.MERCH[i].category}</button>)}
+        <select style={{ width: 'auto', minHeight: 38 }} value={mi} onChange={e => { setMi(+e.target.value); setMade(null); }} aria-label="Merchant">{S.MERCH_ORDER.map(i => <option key={i} value={i}>{(S.MERCH[i].showcase ? '★ ' : '') + S.MERCH[i].name} · {S.MERCH[i].category}</option>)}</select></div>
       <section className="card"><div className="col" style={{ gap: 2 }}><b style={{ fontSize: 20 }}>{m.name}</b><span className="mute sm">{m.category} · {m.segment} · {m.acquirer} · average ticket {money(p.avgTicket)} · {p.n} payments in 30 days · success {p.success}%</span></div>
         <div style={{ overflowX: 'auto' }}><table><thead><tr><th>Instrument</th><th>Enabled</th><th>Share of its payments</th><th>Success</th></tr></thead><tbody>{p.mix.map(x => <tr key={x.instrument}><td>{x.instrument}</td><td><span className={'pill ' + (x.enabled ? 'ok' : 'bad')}>{x.enabled ? 'Enabled' : 'Not enabled'}</span></td><td className="num">{x.share ?? '–'}%</td><td className="num">{x.success ?? '–'}%</td></tr>)}</tbody></table></div></section>
+      {!S.MERCH[mi].enabled[6] && <FitMatrix mi={mi} inst={6} />}
       <section className="card"><div className="row between wrap"><span className="eyebrow">What similar merchants see</span><span className="pill">Peer benchmark, synthetic data</span></div>
         <div className="grid2e">{bench.map(({ i, b }) => <div key={i} className="insight col" style={{ gap: 8 }}><b>{S.INST[i]}</b>
           <div className="row between sm"><span>{m.category} merchants that accept it</span><b className="num">{b.peers} of {b.sameCategory}</b></div>

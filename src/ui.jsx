@@ -45,12 +45,12 @@ export function MerchantPicker({ merchants, value, onChange, allLabel = 'Whole p
   const [q, setQ] = React.useState(''); const [open, setOpen] = React.useState(false);
   const cur = value === '' || value == null ? null : merchants[value];
   const norm = s => s.toLowerCase().replace(/[^a-z0-9 ]/g, '');
-  const list = merchants.map((m, i) => ({ m, i })).filter(({ m }) => !q.trim() || norm(m.name + ' ' + m.category).includes(norm(q.trim()))).sort((a, b) => (norm(a.m.name).startsWith(norm(q.trim())) ? 0 : 1) - (norm(b.m.name).startsWith(norm(q.trim())) ? 0 : 1)).slice(0, 8);
+  const list = merchants.map((m, i) => ({ m, i })).filter(({ m }) => !q.trim() || norm(m.name + ' ' + m.category).includes(norm(q.trim()))).sort((a, b) => (norm(a.m.name).startsWith(norm(q.trim())) ? 0 : 1) - (norm(b.m.name).startsWith(norm(q.trim())) ? 0 : 1)).sort((a, b) => (q.trim() ? 0 : (b.m.showcase ? 1 : 0) - (a.m.showcase ? 1 : 0))).slice(0, 8);
   const pick = i => { onChange(i); setQ(''); setOpen(false); };
   return (<div className="mpick"><div className="chips" onClick={() => setOpen(true)} style={{ minHeight: 40 }}>
     {cur ? <span className="chip">{cur.name}<button type="button" aria-label="Clear merchant" onClick={e => { e.stopPropagation(); pick(''); }}>×</button></span> : <span className="mute sm" style={{ paddingLeft: 4 }}>{allLabel}</span>}
     <input type="text" value={q} placeholder={cur ? '' : 'Type a merchant name'} aria-label="Find a merchant" onFocus={() => setOpen(true)} onChange={e => { setQ(e.target.value); setOpen(true); }} onBlur={() => setTimeout(() => setOpen(false), 150)} onKeyDown={e => { if (e.key === 'Enter' && list[0]) { e.preventDefault(); pick(list[0].i); } if (e.key === 'Escape') { setQ(''); setOpen(false); } }} /></div>
-    {open && <div className="mlist" role="listbox"><button type="button" onMouseDown={e => e.preventDefault()} onClick={() => pick('')}><b>{allLabel}</b></button>{list.map(({ m, i }) => <button type="button" key={i} onMouseDown={e => e.preventDefault()} onClick={() => pick(i)}><b>{m.name}</b><small>{m.category}</small></button>)}{list.length === 0 && <span className="mute sm" style={{ padding: 10 }}>No merchant matches “{q}”.</span>}</div>}</div>);
+    {open && <div className="mlist" role="listbox"><button type="button" onMouseDown={e => e.preventDefault()} onClick={() => pick('')}><b>{allLabel}</b></button>{list.map(({ m, i }) => <button type="button" key={i} onMouseDown={e => e.preventDefault()} onClick={() => pick(i)}><b>{m.showcase ? "★ " : ""}{m.name}</b><small>{m.showcase ? "Demo showcase · " : ""}{m.category}</small></button>)}{list.length === 0 && <span className="mute sm" style={{ padding: 10 }}>No merchant matches “{q}”.</span>}</div>}</div>);
 }
 
 // Reset with clear feedback: asks to confirm, disables while working, then confirms, and raises a toast.

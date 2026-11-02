@@ -223,3 +223,34 @@ export const EXTRA_INST = [
 ];
 export const instName = i => (typeof i === 'number' ? INST[i] : (EXTRA_INST.find(x => x.id === i) || { name: String(i) }).name);
 export const extraInst = i => EXTRA_INST.find(x => x.id === i);
+
+// ---- Credit on UPI: merchant fit check, from a payment-gateway product manager's point of view ----
+export const SHOWCASE = MERCH.map((m, i) => i).filter(i => MERCH[i].showcase);
+export const MERCH_ORDER = [...SHOWCASE, ...MERCH.map((m, i) => i).filter(i => !MERCH[i].showcase)];
+const HIGH_VALUE_CATS = ['Electronics', 'Travel', 'Education', 'Healthcare', 'Home improvement'];
+export function creditFit(mi, inst) {
+  const m = MERCH[mi]; const rows = TX.filter(t => t.m === mi); const n = rows.length; const p = merchantProfile(mi); const pot = merchantPotential(mi);
+  const b = peerBenchmark(mi, inst); const port = rate(TX); const ai = ACQ.indexOf(m.acquirer); const acqUpi = rate(TX.filter(t => t.acq === ai && t.inst >= 4));
+  const st = (v, good, ok) => (v >= good ? 'ok' : v >= ok ? 'warn' : 'bad');
+  const R = [
+    { key: 'volume', label: 'Evidence base', value: n + ' payments in 30 days', rule: 'At least 150 payments, so the pattern is not noise', status: st(n, 150, 60) },
+    { key: 'pool', label: 'Addressable pool: declined for insufficient balance', value: pot.insPct + '% of payments (' + pot.basis + ')', rule: 'At least 3%. This is the part a credit line can complete', status: st(pot.insPct, 3, 1.5) },
+    { key: 'ticket', label: 'Average ticket', value: '₹' + p.avgTicket.toLocaleString('en-IN'), rule: 'At least ₹12,000. Affordability matters at higher tickets', status: st(p.avgTicket, 12000, 5000) },
+    { key: 'hi', label: 'High-ticket share (₹25,000 and above)', value: p.hiShare + '% of payments', rule: 'At least 10%. Where customers stretch to pay', status: st(p.hiShare, 10, 3) },
+    { key: 'cat', label: 'Category fit', value: m.category, rule: 'High-value, aspirational: electronics, travel, education, healthcare, home improvement', status: HIGH_VALUE_CATS.includes(m.category) ? 'ok' : 'warn' },
+    { key: 'succ', label: 'Current success rate', value: p.success + '% against ' + port + '% for the portfolio', rule: 'Below the portfolio means more headroom', status: p.success < port - 2 ? 'ok' : p.success <= port + 2 ? 'warn' : 'bad' },
+    { key: 'peer', label: 'Peer adoption', value: b.peers + ' of ' + b.sameCategory + ' ' + m.category.toLowerCase() + ' peers accept it', rule: 'At least 40% of peers, so demand is proven', status: b.sameCategory && b.peers / b.sameCategory >= 0.4 ? 'ok' : 'warn' },
+    { key: 'net', label: INST[inst] + ' success on the network', value: b.networkSuccess + '%', rule: 'At least 90%', status: st(b.networkSuccess, 90, 85) },
+    { key: 'acq', label: 'Acquirer readiness', value: m.acquirer + ' · UPI success ' + acqUpi + '%', rule: 'Acquirer handles UPI at 90% or better', status: st(acqUpi, 90, 85) },
+    { key: 'gap', label: 'Enablement gap', value: m.enabled[inst] ? 'Already enabled' : 'Not enabled today', rule: 'Not enabled yet', status: m.enabled[inst] ? 'bad' : 'ok' },
+    { key: 'risk', label: 'Dispute and risk exposure', value: 'Not in this dataset', rule: 'Check issuer risk and dispute SLA with the acquirer before a pilot', status: 'check' },
+    { key: 'bin', label: 'BIN enablement and certification', value: 'To confirm with ' + m.acquirer, rule: 'Acquirer and issuer BINs live for credit on UPI', status: 'check' }
+  ];
+  const scored = R.filter(x => x.status !== 'check'); const score = scored.reduce((a, x) => a + (x.status === 'ok' ? 1 : x.status === 'warn' ? 0.5 : 0), 0);
+  const verdict = score >= 8 ? 'Strong fit' : score >= 6 ? 'Moderate fit' : 'Weak fit';
+  return { rows: R, score, outOf: scored.length, verdict, pot, merchant: m, instrument: INST[inst] };
+}
+// Merchants ranked by how many extra payments the insufficient-balance pool could complete, among those without credit on UPI.
+export function topCreditCandidates(limit = 5) {
+  return MERCH.map((m, i) => i).filter(i => (!MERCH[i].enabled[5] || !MERCH[i].enabled[6]) && TX.filter(t => t.m === i).length >= 150).map(i => { const pot = merchantPotential(i); const inst = !MERCH[i].enabled[6] ? 6 : 5; const f = creditFit(i, inst); return { mi: i, inst, name: MERCH[i].name, category: MERCH[i].category, n: pot.n, insPct: pot.insPct, pot, verdict: f.verdict, score: f.score, outOf: f.outOf, pool: Math.round(pot.n * pot.insPct / 100) }; }).sort((a, b) => b.pool - a.pool).slice(0, limit);
+}

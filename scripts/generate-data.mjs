@@ -97,6 +97,22 @@ while (added < 880) {
   if (!status && acqIdx === 1 && day >= 18 && day <= 20 && R3() < 0.095) status = 1;
   tx.push([day, mi, acqIdx, inst, issuerIdx, amount, status]); added++;
 }
+// ---- Fourth pass (own stream R4): two demo showcase merchants that do not yet accept credit on UPI, with a large insufficient-balance decline pool and enough payments to show it. Synthetic. Existing merchants and rows are untouched. ----
+const R4 = rng(SEED + 13579); const g4 = () => Math.sqrt(-2 * Math.log(1 - R4())) * Math.cos(2 * Math.PI * R4());
+const pick4 = w => { const t = w.reduce((a, b) => a + b, 0); let x = R4() * t; for (let i = 0; i < w.length; i++) { x -= w[i]; if (x <= 0) return i; } return w.length - 1; };
+const SHOW = [
+  { name: 'Aurora Appliances', category: 'Electronics', segment: 'Organised retail', acquirer: 'Acquirer A', median: 32000, spread: 0.55, n: 360, ins: 0.092 },
+  { name: 'Summit Holidays', category: 'Travel', segment: 'Travel & hospitality', acquirer: 'Acquirer D', median: 24000, spread: 0.6, n: 320, ins: 0.078 }
+];
+const IW = [14, 7, 22, 16, 34, 0, 0, 7, 0], IM = [1.5, 0.25, 0.45, 0.45, 1.5, 0, 0, 1.0, 0]; const meanM = IW.reduce((a, w, i) => a + w * IM[i], 0) / IW.reduce((a, b) => a + b, 0);
+SHOW.forEach(sm => {
+  const m = { id: merchants.length, name: sm.name, category: sm.category, segment: sm.segment, acquirer: sm.acquirer, median: sm.median, spread: sm.spread, enabled: [1, 1, 1, 1, 1, 0, 0, 1, 0], showcase: true }; merchants.push(m); const mi = m.id; const acqIdx = ACQUIRERS.indexOf(m.acquirer);
+  for (let k = 0; k < sm.n; k++) {
+    const inst = pick4(IW); const amount = Math.max(50, Math.round(m.median * Math.exp(g4() * m.spread) / 10) * 10); const day = Math.floor(R4() * 30); const issuerIdx = Math.floor(R4() * ISSUERS.length);
+    let status = 0; if (R4() < sm.ins * IM[inst] / meanM) status = 3; else if (R4() < 0.055) status = 1 + pick4([22, 40, 0, 18, 12, 8]);
+    tx.push([day, mi, acqIdx, inst, issuerIdx, amount, status]);
+  }
+});
 const ACQ_LAT = [380, 420, 470, 350], ACQ_COST = [100, 96, 92, 104];
 const INST_LAT = [1.0, 1.05, 0.95, 0.95, 0.8, 1.1, 1.3, 1.9, 0.7], INST_COST = [0.55, 1.1, 1.25, 1.25, 0.35, 0.6, 0.9, 0.8, 0.7];
 tx.forEach(t => {

@@ -137,3 +137,9 @@ table{border-collapse:collapse;width:100%;font-size:14px}th{text-align:left;font
 .seg{max-width:100%;overflow-x:auto}
 @media(max-width:900px){.grid2,.grid2.split,.grid2e{grid-template-columns:minmax(0,1fr)!important}.brandname{display:inline!important;font-size:15px}}
 @media(min-width:901px) and (max-width:1180px){.brandname{display:none}}
+.grid3t{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.grid3t .kt{background:var(--s2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+@media(max-width:700px){.grid3t{grid-template-columns:1fr}}
+.nav{min-width:0;overflow-x:auto;scrollbar-width:none}.nav::-webkit-scrollbar{display:none}.nav a{white-space:nowrap}
+@media(max-width:1500px){.nav a{padding:8px 9px;font-size:13.5px}.nav{gap:2px}}
+.top .spacer{flex:0 0 0;width:0}.nav{flex:1 1 auto}
+@media(max-width:1320px){.nav a{padding:8px 7px;font-size:13px}}

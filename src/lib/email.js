@@ -22,6 +22,8 @@ const stat = (big, small, note) => `<td style="width:33%;vertical-align:top;padd
 export function proposalEmail(p, urls) {
   const m = S.MERCH[p.merchantId]; const inst = p.instruments[0]; const name = S.instName(inst); const credit = inst === 5 || inst === 6; const ex = S.extraInst(inst); const b = typeof inst === 'number' ? S.peerBenchmark(p.merchantId, inst) : null; const pot = credit ? S.merchantPotential(p.merchantId) : null;
   if (!credit) return genericProposal(p, m, name, ex, b, urls);
+  const fit = S.creditFit(p.merchantId, inst); const MK = { ok: ['Meets', '#1B7F4B'], warn: ['Partly', '#9A6700'], bad: ['Not yet', '#B42318'] };
+  const fitTable = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:12.5px;border-collapse:collapse">${fit.rows.filter(r => MK[r.status]).slice(0, 8).map(r => `<tr><td style="padding:6px 0;border-bottom:1px solid ${LINE};color:${INK}">${esc(r.label)}</td><td style="padding:6px 8px;border-bottom:1px solid ${LINE};color:${MUTE}">${esc(r.value)}</td><td style="padding:6px 0;border-bottom:1px solid ${LINE};text-align:right;font-weight:700;color:${MK[r.status][1]}">${MK[r.status][0]}</td></tr>`).join('')}</table><div style="font-size:12px;color:${MUTE};margin-top:8px">Overall: ${esc(fit.verdict)} (${fit.score} of ${fit.outOf} checks).</div>`;
   const u = urls || { interested: '#interested', more: '#more', later: '#later' };
   const subject = `${m.name}: a way to complete more of your payments (${name}) [${p.id}]`;
   const mk = MARKET;
@@ -44,6 +46,8 @@ export function proposalEmail(p, urls) {
   <tr><td style="padding:22px 28px 4px">${sec('The market, in numbers')}
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${stat(mk.upi.vol, 'UPI payments in ' + mk.upi.when, mk.upi.yoy + ' on a year earlier')}${stat(mk.upi.val, 'moved over UPI in ' + mk.upi.when, mk.upi.daily + ' payments a day')}${stat(mk.ru.txn, 'RuPay credit card payments on UPI in ' + mk.ru.when, mk.ru.val + ' in value')}</tr></table>
     <div style="font-size:13px;line-height:1.6;margin-top:12px;color:${INK}">Customers already pay by credit on UPI at scale. ${b.peers} of ${b.sameCategory} ${esc(m.category.toLowerCase())} merchants in our sample already accept ${esc(name)}, and it succeeds ${b.networkSuccess}% of the time across the network in that sample.</div></td></tr>
+
+  <tr><td style="padding:18px 28px 4px">${sec('Why this fits ' + m.name)}${fitTable}</td></tr>
 
   <tr><td style="padding:18px 28px 4px">${sec('How the range is worked out')}
     <div style="font-size:12.5px;line-height:1.65;color:${MUTE};border-left:3px solid ${LINE};padding-left:12px">${pot.insPct}% of payments (${pot.basis}) are declined for insufficient balance. We assume ${Math.round(S.POTENTIAL_ASSUMPTION.low * 100)}% to ${Math.round(S.POTENTIAL_ASSUMPTION.high * 100)}% of those could complete through a credit line. That gives the range above. A short trial would replace this assumption with your own measured result.</div></td></tr>
