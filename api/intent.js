@@ -5,7 +5,8 @@ const page = (title, msg) => `<!doctype html><meta charset="utf-8"><meta name="v
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.setHeader('Cache-Control', 'no-store');
   if (!status().server) return res.status(503).send(page('Not available', 'This link is not active right now.'));
-  const q = req.query || Object.fromEntries(new URL(req.url, 'http://x').searchParams); const m = MAP[q.v];
+  const q = req.query || Object.fromEntries(new URL(req.url, 'http://x').searchParams); if (q.v === 'choose') { if (!q.p || q.t !== intentToken(String(q.p), 'choose')) return res.status(400).send(page('Link not valid', 'This link is invalid or has expired.')); const l = v => `/api/intent?p=${encodeURIComponent(String(q.p))}&v=${v}&t=${intentToken(String(q.p), v)}`; const b = (v, t) => `<a href="${l(v)}" style="display:block;margin:10px 0;padding:14px 18px;border-radius:10px;background:#2F5BEA;color:#fff;text-decoration:none;font-weight:700;text-align:center">${t}</a>`; return res.status(200).send(page('Your reply', 'Please choose one. Nothing is switched on by replying.</p>' + b('interested', 'Yes, I would like to explore this') + b('more', 'Tell me more') + b('later', 'Not now') + '<p>')); }
+  const m = MAP[q.v];
   if (!m || !q.p || q.t !== intentToken(String(q.p), String(q.v))) return res.status(400).send(page('Link not valid', 'This link is invalid or has expired.'));
   const p = await hget('proposals', String(q.p)); if (!p) return res.status(404).send(page('Not found', 'We could not find this proposal.'));
   if (!['interested', 'wants_call', 'not_now'].includes(p.status) || p.status !== m[0]) {

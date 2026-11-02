@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     else if (b.kind === 'proposal') {
       const p = await hget('proposals', b.id); if (!p) return res.status(404).json({ error: 'proposal not found' }); ctxItem = p; const base = baseUrl(req);
       const u = v => `${base}/api/intent?p=${encodeURIComponent(p.id)}&v=${v}&t=${intentToken(p.id, v)}`;
-      mail = proposalEmail(p, { interested: u('interested'), more: u('more'), later: u('later') });
+      mail = proposalEmail(p, { choose: u('choose'), interested: u('interested'), more: u('more'), later: u('later') });
       const i0 = p.instruments[0]; const credit = i0 === 5 || i0 === 6; const pot = credit ? S.merchantPotential(p.merchantId) : null; const mn = S.MERCH[p.merchantId];
       if (credit) { tg = `${mn.name}: a way to complete more of your payments (${S.instName(p.instruments[0])})\n\nIllustrative potential: +${pot.lowPts.toFixed(2)} to +${pot.highPts.toFixed(2)} percentage points on payment success (${pot.per1000[0]} to ${pot.per1000[1]} more completed payments per 1,000 attempts), assuming a share of insufficient-balance declines complete via a credit line. Not a forecast. Demo merchant, synthetic payment data; UPI market figures are NPCI data, Sept 2026.\n\nNo commercial terms. Nothing is switched on until you reply.`; tgButtons = [['Yes, I would like to explore this', u('interested')], ['Tell me more', u('more')], ['Not now', u('later')]]; } else tg = `${mn.name}: a proposal to add ${S.instName(i0)}\n\nNo gain has been estimated; a short trial would measure it. Demo merchant, synthetic data.\n\nNo commercial terms. Nothing is switched on until you reply.`; 
     }

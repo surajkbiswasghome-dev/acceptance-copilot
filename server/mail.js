@@ -7,7 +7,7 @@ export async function sendMail({ to, subject, html, text }) {
   const e = env(); if (!e.gmailUser || !e.gmailPass) return { ok: false, error: 'Email is not connected (add GMAIL_USER and GMAIL_APP_PASSWORD in Vercel)' };
   const t = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: e.gmailUser, pass: e.gmailPass } });
   try {
-    const info = await t.sendMail({ from: `"Acceptance Copilot (demo)" <${e.gmailUser}>`, to: to.join(','), subject, html, text });
+    const info = await t.sendMail({ from: `"Manthan Acceptance Copilot" <${e.gmailUser}>`, replyTo: e.gmailUser, to: to.join(','), subject, html, text });
     const acc = (info.accepted || []).map(String), rej = (info.rejected || []).map(String);
     // Gmail accepting the message is not the same as delivery, but a rejected address is a clear failure we can report.
     if (!acc.length) return { ok: false, error: 'Gmail accepted none of the addresses' + (rej.length ? ': ' + rej.join(', ') : '') };
