@@ -29,7 +29,7 @@ export default function Login({ onLogin, theme, setTheme }) {
     <div className="login">
       {steps && <SigningIn steps={steps} />}
       <div className="l">
-        <div className="row"><Logo size={30} /><b style={{ fontSize: 17 }}>Sadhana Acceptance Copilot</b></div>
+        <div className="row"><Logo size={30} /><b style={{ fontSize: 17 }}>Manthan Acceptance Copilot</b></div>
         <div className="col" style={{ gap: 8 }}>
           <h1>See where acceptance leaks.</h1>
           <p className="mute" style={{ maxWidth: '54ch', fontSize: 15, margin: 0 }}>It turns acceptance data into a prioritised, approvable action plan. A person approves every action, and it is logged.</p>
