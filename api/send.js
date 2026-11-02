@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     if (channels.email) {
       if (!to.length) results.push({ channel: 'email', status: 'failed', note: 'No recipient given' });
       else if (!allowedTo(to)) results.push({ channel: 'email', to: to.join(', '), status: 'blocked', note: 'Recipient is not on the allowed list. Add it to ALLOWED_RECIPIENTS in Vercel.' });
-      else { const r = await sendMail({ to, ...mail }); results.push({ channel: 'email', to: to.join(', '), status: r.ok ? 'sent' : 'failed', note: r.error || '' }); }
+      else { const r = await sendMail({ to, ...mail }); results.push({ channel: 'email', to: to.join(', '), status: r.ok ? 'sent' : 'failed', note: r.error || (r.rejected && r.rejected.length ? 'Gmail handed over ' + r.accepted.join(', ') + ' but REJECTED ' + r.rejected.join(', ') + '. Check the spelling of that address.' : 'Handed to Gmail for ' + r.accepted.join(', ') + '. If it does not arrive, open the Sent folder and look for a bounce message in the inbox of ' + (process.env.GMAIL_USER || 'the sending account') + '.') }); }
     }
     if (channels.telegram && tg) {
       if (tgTo && !allowedChat(tgTo)) results.push({ channel: 'telegram', to: tgTo, status: 'blocked', note: 'This chat is not on the allowed list. Add it to ALLOWED_TELEGRAM_CHATS in Vercel.' });

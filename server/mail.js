@@ -3,10 +3,16 @@ import { env, status } from './lib.js';
 // Only addresses on the allowed list can receive email. The merchants in this prototype are fictional.
 export const allowedTo = list => { const e = env(); return list.every(a => e.allow.includes(String(a).trim().toLowerCase())); };
 export async function sendMail({ to, subject, html, text }) {
-  if (globalThis.__MAIL_CAPTURE) { globalThis.__MAIL_CAPTURE.push({ to, subject, html, text }); return { ok: true }; }
+  if (globalThis.__MAIL_CAPTURE) { globalThis.__MAIL_CAPTURE.push({ to, subject, html, text }); return { ok: true, accepted: to, rejected: [] }; }
   const e = env(); if (!e.gmailUser || !e.gmailPass) return { ok: false, error: 'Email is not connected (add GMAIL_USER and GMAIL_APP_PASSWORD in Vercel)' };
   const t = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: e.gmailUser, pass: e.gmailPass } });
-  try { await t.sendMail({ from: `"Acceptance Copilot (demo)" <${e.gmailUser}>`, to: to.join(','), subject, html, text }); return { ok: true }; } catch (err) { return { ok: false, error: 'Gmail refused: ' + String(err.message || err).slice(0, 140) }; }
+  try {
+    const info = await t.sendMail({ from: `"Acceptance Copilot (demo)" <${e.gmailUser}>`, to: to.join(','), subject, html, text });
+    const acc = (info.accepted || []).map(String), rej = (info.rejected || []).map(String);
+    // Gmail accepting the message is not the same as delivery, but a rejected address is a clear failure we can report.
+    if (!acc.length) return { ok: false, error: 'Gmail accepted none of the addresses' + (rej.length ? ': ' + rej.join(', ') : '') };
+    return { ok: true, accepted: acc, rejected: rej, id: String(info.messageId || ''), response: String(info.response || '').slice(0, 80) };
+  } catch (err) { return { ok: false, error: 'Gmail refused: ' + String(err.message || err).slice(0, 140) }; }
 }
 export const allowedChat = id => { const e = env(); return e.tgAllow.includes(String(id).trim()); };
 export async function sendTelegram(text, chatId, buttons) {
