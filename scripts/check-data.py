@@ -47,4 +47,16 @@ va = [r for r in T if r[3]==2 and r[2]==0]; vo = [r for r in T if r[3]==2 and r[
 check('pattern7 Visa auth failures at Acquirer A', auth(va) > 2*auth(vo), f'A {auth(va):.1f}% vs others {auth(vo):.1f}%')
 # enable flags
 check('enable flags', all(len(m['enabled']) == 9 for m in M) and any(not m['enabled'][5] for m in M), 'flags present')
+
+# ---- Phase 2: EMI events and synthetic customers ----
+E = d['emi']['events']; CU = d['customers']['rows']
+check('emi shape', len(E) > 2500 and all(len(m['emi']) == 3 for m in M), f'{len(E)} events')
+check('emi showcase has card EMI only', all(m['emi'] == [0, 0, 1] for m in M if m.get('showcase')), 'showcase flags')
+check('emi on UPI merchants', 7 <= sum(m['emi'][0] for m in M) <= 12, f"{sum(m['emi'][0] for m in M)} merchants")
+def erate(rows): return 100 * sum(r[6] == 0 for r in rows) / len(rows)
+check('emi pattern issuer conversion decline', (lambda a, b: a > 3 * b)(*[100 * sum(r[6] == 3 for r in rows) / len(rows) for rows in ([r for r in E if r[2] < 2 and r[3] == 4], [r for r in E if r[2] < 2 and r[3] != 4])]), 'Issuer 05 declines EMI conversion')
+check('emi pattern long tenure drops on small tickets', (lambda a, b: a > b + 20)(*[100 * sum(r[6] == 1 for r in rows) / len(rows) for rows in ([r for r in E if r[5] >= 12 and r[4] < 10000], [r for r in E if not (r[5] >= 12 and r[4] < 10000)])]), 'long tenure on small tickets')
+check('emi pattern plan display failures at Acquirer C', (lambda a, b: a > 2.5 * b)(*[100 * sum(r[6] == 4 for r in rows) / len(rows) for rows in ([r for r in E if r[2] < 2 and M[r[1]]['acquirer'] == 'Acquirer C'], [r for r in E if r[2] < 2 and M[r[1]]['acquirer'] != 'Acquirer C'])]), 'technical failures at Acquirer C')
+check('customers', len(CU) == 600 and all(r[2] > 0 for r in CU) and sum(r[0] == 3 for r in CU) > 40, f'{len(CU)} synthetic customers')
+
 sys.exit(1 if fails else 0)

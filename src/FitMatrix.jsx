@@ -15,5 +15,5 @@ export function Showcase({ onUse, compact }) {
     <div className="grid2e">{S.SHOWCASE.map(mi => { const fit5 = S.creditFit(mi, 6); const pot = fit5.pot; const m = S.MERCH[mi]; return (<div key={mi} className="insight col" style={{ gap: 8 }}><div className="row between wrap"><b style={{ fontSize: 17 }}>{m.name}</b><span className={'pill ' + (fit5.verdict === 'Strong fit' ? 'ok' : 'warn')}>{fit5.verdict} · {fit5.score} of {fit5.outOf}</span></div>
       <span className="mute sm">{m.category} · {m.segment} · {m.acquirer} · {pot.n} payments · ticket {money(pot.avgTicket)}</span>
       <div className="row between sm"><span>Declined for insufficient balance</span><b className="num">{pot.insPct}%</b></div><div className="row between sm"><span>Potential on success rate</span><b className="num">+{pot.lowPts.toFixed(2)} to +{pot.highPts.toFixed(2)} pts</b></div>
-      {onUse && <div className="row wrap">{[6, 5].map(i => <button key={i} className="btn pri" style={{ minHeight: 38 }} onClick={() => onUse(mi, i)}>Propose {S.INST[i]}</button>)}</div>}</div>); })}</div></section>);
+      {onUse && <div className="row wrap">{[6, 5, 'emi:upicc'].map(i => <button key={i} className="btn pri" style={{ minHeight: 38 }} onClick={() => onUse(mi, i)}>Propose {S.instName(i)}</button>)}</div>}</div>); })}</div></section>);
 }

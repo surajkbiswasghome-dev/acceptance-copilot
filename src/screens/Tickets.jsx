@@ -4,11 +4,14 @@ import { statusPill, statusText } from '../lib/notify.js';
 import { Head } from '../ui.jsx';
 
 const fromHash = () => (location.hash.split('?id=')[1] || '').split('&')[0] || null;
-const tone = s => (/Closed|Applied/.test(s) ? 'ok' : /Rejected/.test(s) ? 'bad' : /Pending|Open|awaiting/.test(s) ? 'warn' : '');
+const tone = s => (/Closed|Applied|policy active/.test(s) ? 'ok' : /Rejected/.test(s) ? 'bad' : /Pending|Open|awaiting/.test(s) ? 'warn' : '');
 // What each role can do next on a ticket
 function moves(t, role) {
   const m = []; const staff = ['pm', 'head'].includes(role.id); const dev = role.id === 'dev';
-  if (t.kind === 'Routing change') {
+  if (t.kind === 'Policy change') {
+    if (t.status === 'Pending approval' && role.canApproveRouting) { if (t.requesterId === role.id) return [{ note: 'You raised this request. A second person has to approve it.' }]; m.push({ label: 'Approve policy change', to: 'Approved, policy active', pri: 1 }, { label: 'Reject', to: 'Rejected' }); }
+    if (t.status === 'Approved, policy active' && staff) m.push({ label: 'Close', to: 'Closed' });
+  } else if (t.kind === 'Routing change') {
     if (t.status === 'Pending approval' && role.canApproveRouting) { if (t.requesterId === role.id) return [{ note: 'You raised this request. A second person has to approve it.' }]; m.push({ label: 'Approve routing change', to: 'Approved, ready to apply', pri: 1 }, { label: 'Reject', to: 'Rejected' }); }
     if (t.status === 'Approved, ready to apply' && (dev || role.canApproveRouting)) m.push({ label: 'Mark as applied', to: 'Applied', pri: 1 });
     if (t.status === 'Applied' && staff) m.push({ label: 'Verify and close', to: 'Closed', pri: 1 });
@@ -27,7 +30,7 @@ export default function Tickets({ role }) {
   useEffect(() => { const f = () => setSel(fromHash()); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
   const rows = [...all].sort((a, b) => (b.ts || '').localeCompare(a.ts || '')).filter(t => fs === 'All' || (fs === 'Open work' ? !['Closed', 'Rejected'].includes(t.status) : t.kind === fs));
   const t = all.find(x => x.id === sel);
-  const act = async (to) => { const now = new Date().toISOString(); await put('tickets', { ...t, status: to, ts: t.ts, events: [...t.events, { ts: now, who: role.name, text: 'Status changed to ' + to }] }); await audit(role.name, 'Ticket ' + to, t.title, t.id); };
+  const act = async (to) => { const now = new Date().toISOString(); if (t.kind === 'Policy change' && to === 'Approved, policy active' && t.policy) await put('policy', { id: 'active', policy: t.policy, ts: now, ticket: t.id }); await put('tickets', { ...t, status: to, ts: t.ts, events: [...t.events, { ts: now, who: role.name, text: 'Status changed to ' + to }] }); await audit(role.name, 'Ticket ' + to, t.title, t.id); };
   const addComment = async () => { if (!comment.trim()) return; await put('tickets', { ...t, events: [...t.events, { ts: new Date().toISOString(), who: role.name, text: comment.trim() }] }); setComment(''); };
   return (
     <>

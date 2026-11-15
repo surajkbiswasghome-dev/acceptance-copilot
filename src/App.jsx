@@ -15,11 +15,18 @@ import Brief from './screens/Brief.jsx';
 import Agents from './screens/Agents.jsx';
 import Account from './screens/Account.jsx';
 import Login from './screens/Login.jsx';
+import Emi from './screens/Emi.jsx';
+import AffOverview from './screens/AffOverview.jsx';
+import AffCustomers from './screens/AffCustomers.jsx';
+import AffDecide from './screens/AffDecide.jsx';
+import AffOffers from './screens/AffOffers.jsx';
+import AffSim from './screens/AffSim.jsx';
+import AffPolicy from './screens/AffPolicy.jsx';
 import { Welcome, Chat } from './Assistant.jsx';
 import { DEFAULT_LANG } from './lib/lang.js';
 
-const LABEL = { insights: 'Insights', diagnose: 'Diagnose', explain: 'Explain', recommend: 'Recommend', proposals: 'Proposals', enable: 'Enablement', tickets: 'Tickets', pilot: 'Pilot', brief: 'Brief', agents: 'Agents' };
-const SCREENS = { insights: Insights, diagnose: Diagnose, explain: Explain, recommend: Recommend, proposals: Proposals, enable: Enable, tickets: Tickets, pilot: Pilot, brief: Brief, agents: Agents, account: Account };
+const LABEL = { insights: 'Insights', diagnose: 'Diagnose', explain: 'Explain', recommend: 'Recommend', proposals: 'Proposals', enable: 'Enablement', tickets: 'Tickets', pilot: 'Pilot', brief: 'Brief', agents: 'Agents', emi: 'EMI', aoverview: 'Overview', acustomers: 'Customers', adecide: 'Decision', aoffers: 'Offer engine', asim: 'Simulator', apolicy: 'Policy' };
+const SCREENS = { insights: Insights, diagnose: Diagnose, explain: Explain, recommend: Recommend, proposals: Proposals, enable: Enable, tickets: Tickets, pilot: Pilot, brief: Brief, agents: Agents, account: Account, emi: Emi, aoverview: AffOverview, acustomers: AffCustomers, adecide: AffDecide, aoffers: AffOffers, asim: AffSim, apolicy: AffPolicy };
 const useRoute = () => { const get = () => (location.hash.replace('#/', '') || 'insights').split('?')[0]; const [r, setR] = useState(get); useEffect(() => { const f = () => setR(get()); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []); return r; };
 
 export default function App() {
@@ -30,16 +37,16 @@ export default function App() {
   useEffect(() => { document.documentElement.dataset.theme = theme; const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = theme === 'dark' ? '#0A1020' : '#F3F2ED'; }, [theme]);
   useEffect(() => { setOpen(false); setMore(false); window.scrollTo(0, 0); }, [route]);
   useEffect(() => { const f = () => { conn.setLocal(); setUser(null); location.hash = ''; }; addEventListener('ac-unauth', f); return () => removeEventListener('ac-unauth', f); }, []);
-  if (!user || !ROLES.some(r => r.id === user)) return <Login theme={theme} setTheme={setTheme} onLogin={(r, g) => { try { g === false ? sessionStorage.setItem('ac_welcomed', '1') : sessionStorage.removeItem('ac_welcomed'); } catch {} setWelcome(g !== false); setUser(r.id); audit(r.name, 'Signed in', 'Workspace'); location.hash = '#/insights'; }} />;
+  if (!user || !ROLES.some(r => r.id === user)) return <Login theme={theme} setTheme={setTheme} onLogin={(r, g) => { try { g === false ? sessionStorage.setItem('ac_welcomed', '1') : sessionStorage.removeItem('ac_welcomed'); } catch {} setWelcome(g !== false); setUser(r.id); audit(r.name, 'Signed in', 'Workspace'); location.hash = r.id === 'aff' ? '#/aoverview' : '#/insights'; }} />;
   const role = roleById(user);
   const signOut = () => { audit(role.name, 'Signed out', 'Workspace'); conn.setLocal(); setUser(null); location.hash = ''; };
   const allowed = route === 'account' || role.views.includes(route);
-  const Screen = allowed ? SCREENS[route] || Diagnose : Diagnose;
+  const Screen = allowed ? SCREENS[route] || Diagnose : (SCREENS[role.views[0]] || Diagnose);
   const bottom = role.views.length > 5 ? role.views.slice(0, 4) : role.views; const rest = role.views.length > 5 ? role.views.slice(4) : [];
   return (
     <div className="shell">
       <header className="top">
-        <a href="#/insights" className="brand"><Logo /><span className="brandname">Manthan Acceptance Copilot</span></a>
+        <a href={'#/' + role.views[0]} className="brand"><Logo /><span className="brandname">{role.id === 'aff' ? 'Manthan Affordability Engine' : 'Manthan Acceptance Copilot'}</span></a>
         <nav className="nav" aria-label="Views">{role.views.map(k => <a key={k} href={'#/' + k} className={route === k ? 'on' : ''} aria-current={route === k ? 'page' : undefined}>{LABEL[k]}</a>)}</nav>
         <div style={{ flex: 1 }} className="spacer" />
         <div className="tools" style={{ position: 'relative' }}>

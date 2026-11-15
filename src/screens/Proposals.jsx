@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FitMatrix, Showcase } from '../FitMatrix.jsx';
+import { EmiFitMatrix } from '../EmiParts.jsx';
+import * as E from '../lib/emi.js';
 import * as S from '../lib/stats.js';
 import { proposalEmail } from '../lib/email.js';
 import { useColl, put, audit, uid, callApi, conn } from '../lib/db.js';
@@ -12,12 +14,13 @@ export default function Proposals({ role }) {
   const all = useColl('proposals'); const notes = useColl('notifications');
   const [sel, setSel] = useState(fromHash()); const [to, setTo] = useState([]); const [phone, setPhone] = useState(''); const [callMsg, setCallMsg] = useState(null); const [viaEmail, setViaEmail] = useState(true); const [plain, setPlain] = useState(false); const [viaTg, setViaTg] = useState(false); const [tgId, setTgId] = useState(''); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState(null);
   const [nm, setNm] = useState(S.SHOWCASE[0] ?? S.MERCH.findIndex(m => m.category === 'Electronics')); const [ni, setNi] = useState([5]);
+  useEffect(() => { try { const pf = JSON.parse(sessionStorage.getItem('ac_prefill') || 'null'); if (pf) { sessionStorage.removeItem('ac_prefill'); setNm(pf.mi); setNi([pf.inst]); setSel(null); } } catch {} }, []);
   useEffect(() => { const f = () => setSel(fromHash()); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
   const rows = [...all].sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
   const p = all.find(x => x.id === sel); const counts = Object.keys(PSTATUS).map(k => [k, all.filter(x => x.status === k).length]);
   const mail = useMemo(() => (p ? proposalEmail(p) : null), [p?.id, p?.instruments?.join()]);
   const canEdit = ['pm', 'head', 'en'].includes(role.id);
-  const valid = ni.filter(i => typeof i !== 'number' || !S.MERCH[nm].enabled[i]);
+  const valid = ni.filter(i => typeof i === 'number' ? !S.MERCH[nm].enabled[i] : E.isEmi(i) ? !S.MERCH[nm].emi[E.emiProduct(i).code] : true); const emiSel = ni.find(i => E.isEmi(i));
   const create = async () => { if (!valid.length) return; const now = new Date().toISOString(); const id = uid('PRP'); await put('proposals', { id, merchantId: nm, instruments: valid, status: 'draft', created: now, ts: now, events: [{ ts: now, who: role.name, text: 'Draft created' }] }); await audit(role.name, 'Created proposal', S.MERCH[nm].name, id); setSel(id); history.replaceState(null, '', '#/proposals?id=' + id); };
   const ev = (text, extra = {}) => put('proposals', { ...p, ...extra, events: [...p.events, { ts: new Date().toISOString(), who: role.name, text }] });
   const send = async () => {
@@ -41,12 +44,13 @@ export default function Proposals({ role }) {
       <div className="chiprow">{counts.map(([k, n]) => <span key={k} className={'pill ' + PSTATUS[k][1]}>{PSTATUS[k][0]}: {n}</span>)}</div>
       {canEdit && <Showcase onUse={(mi, i) => { setNm(mi); setNi([i]); setTimeout(() => document.getElementById('fitm')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }} />}
       {canEdit && ni.some(i => i === 5 || i === 6) && <div id="fitm"><FitMatrix mi={nm} inst={ni.includes(6) && !S.MERCH[nm].enabled[6] ? 6 : 5} /></div>}
+      {canEdit && emiSel && <div id="fitm"><EmiFitMatrix mi={nm} product={E.emiProduct(emiSel).code} /></div>}
       <div className="grid2 split" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.3fr)', alignItems: 'start' }}>
         <div className="col gap16">
           {canEdit && <section className="card"><span className="eyebrow">New proposal</span>
             <select value={nm} onChange={e => setNm(+e.target.value)} aria-label="Merchant">{S.MERCH_ORDER.map(i => <option key={i} value={i}>{(S.MERCH[i].showcase ? '★ ' : '') + S.MERCH[i].name} · {S.MERCH[i].category}</option>)}</select>
             <div className="mute sm">Only options this merchant does not accept yet can be proposed. Ones already enabled are shown locked.</div>
-            <div className="chiprow">{S.INST.map((n, i) => { const on = !!S.MERCH[nm].enabled[i]; return <label key={i} className="row sm" style={{ opacity: on ? .55 : 1 }}><input type="checkbox" disabled={on} checked={!on && ni.includes(i)} onChange={e => setNi(e.target.checked ? [...ni, i] : ni.filter(x => x !== i))} />{n}{on ? ' · enabled' : ''}</label>; })}{S.EXTRA_INST.map(x => <label key={x.id} className="row sm" title={x.what}><input type="checkbox" checked={ni.includes(x.id)} onChange={e => setNi(e.target.checked ? [...ni, x.id] : ni.filter(y => y !== x.id))} />{x.name}</label>)}</div>
+            <div className="chiprow">{S.INST.map((n, i) => { const on = !!S.MERCH[nm].enabled[i]; return <label key={i} className="row sm" style={{ opacity: on ? .55 : 1 }}><input type="checkbox" disabled={on} checked={!on && ni.includes(i)} onChange={e => setNi(e.target.checked ? [...ni, i] : ni.filter(x => x !== i))} />{n}{on ? ' · enabled' : ''}</label>; })}{E.EMI_PRODUCTS.map(x => { const on = !!S.MERCH[nm].emi[x.code]; return <label key={x.id} className="row sm" title={x.what} style={{ opacity: on ? .55 : 1 }}><input type="checkbox" disabled={on} checked={!on && ni.includes(x.id)} onChange={e => setNi(e.target.checked ? [...ni, x.id] : ni.filter(y => y !== x.id))} />{x.name}{on ? ' · enabled' : ''}</label>; })}{S.EXTRA_INST.map(x => <label key={x.id} className="row sm" title={x.what}><input type="checkbox" checked={ni.includes(x.id)} onChange={e => setNi(e.target.checked ? [...ni, x.id] : ni.filter(y => y !== x.id))} />{x.name}</label>)}</div>
             <button className="btn pri" disabled={!valid.length} onClick={create}>Create draft</button></section>}
           <section className="card"><span className="eyebrow">{rows.length} proposal{rows.length === 1 ? '' : 's'}</span>
             {rows.length === 0 ? <p className="mute">None yet. Create one here, from Recommend, or from an approved finding on Explain.</p> :

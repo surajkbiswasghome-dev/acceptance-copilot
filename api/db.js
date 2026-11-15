@@ -1,5 +1,5 @@
 import { authed, hgetall, hput, redis, status } from '../server/lib.js';
-const W = { decisions: ['pm', 'head'], tickets: ['pm', 'head', 'dev', 'en'], proposals: ['pm', 'head', 'en'], notifications: ['pm', 'head', 'dev', 'en'], audit: ['pm', 'head', 'dev', 'en'], pilot: ['pm', 'head'], checks: ['pm', 'head', 'en'], settings: ['pm', 'head'] };
+const W = { decisions: ['pm', 'head'], policy: ['pm', 'head'], tickets: ['pm', 'head', 'dev', 'en', 'aff'], proposals: ['pm', 'head', 'en'], notifications: ['pm', 'head', 'dev', 'en', 'aff'], audit: ['pm', 'head', 'dev', 'en', 'aff'], pilot: ['pm', 'head'], checks: ['pm', 'head', 'en'], settings: ['pm', 'head'] };
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (!status().server) return res.status(503).json({ error: 'server storage is not configured' });

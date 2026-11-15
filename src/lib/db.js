@@ -39,5 +39,5 @@ export async function clearAll(names) {
 export async function callApi(path, body) { return server(path, { method: 'POST', body: JSON.stringify(body) }); }
 export const uid = p => p + '-' + Math.floor(1000 + Math.random() * 9000);
 export const audit = (who, action, target, detail = '') => put('audit', { id: Date.now() + '-' + Math.random().toString(36).slice(2, 6), ts: new Date().toISOString(), who, action, target, detail });
-export const COLLECTIONS = ['decisions', 'tickets', 'proposals', 'notifications', 'audit', 'pilot', 'checks'];
+export const COLLECTIONS = ['decisions', 'tickets', 'proposals', 'notifications', 'audit', 'pilot', 'checks', 'policy'];
 export const resetDemo = () => clearAll(COLLECTIONS);

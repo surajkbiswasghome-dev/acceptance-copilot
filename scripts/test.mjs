@@ -59,3 +59,14 @@ test('copilot names credit-on-UPI candidates', async () => {
   const r = reply('Which merchants should I show for credit line on UPI?', { proposals: [] }, { name: 'Priya' }, 'proposals');
   assert.match(r.text, /Aurora Appliances/); assert.match(r.text, /Summit Holidays/);
 });
+
+// ---- Phase 2: EMI and affordability ----
+import * as EM from '../src/lib/emi.js'; import * as AF from '../src/lib/afford.js';
+test('emi funnel is monotonic and covers every event', () => { const f = EM.funnel(EM.EV); assert.equal(f.shown, EM.EV.length); assert.ok(f.shown >= f.selected && f.selected >= f.eligible && f.eligible >= f.converted); assert.equal(f.converted + f.left + f.notEligible + f.declined + f.technical, f.shown); });
+test('emi findings include the issuer, acquirer and tenure patterns', () => { const t = EM.emiFindings().map(f => f.title).join(' | '); assert.match(t, /Issuer 05/); assert.match(t, /Acquirer C/); assert.match(t, /tenure/i); });
+test('showcase merchants rank top for EMI on UPI', () => { const top = EM.emiRanking(2).map(x => S.MERCH[x.mi ?? x.i]?.name); assert.ok(top.includes('Aurora Appliances') && top.includes('Summit Holidays'), top.join()); });
+test('every approved offer respects the income cap and the available limit', () => { for (const code of [0, 1, 2]) for (const c of AF.CUSTOMERS) { const d = AF.decide(c, 40000, code); if (d.decision === 'Decline') continue; assert.ok(d.amount <= d.available, c.id); assert.ok(d.tenures.some(t => t.ok), c.id); } });
+test('every decline carries a reason code that exists', () => { for (const code of [0, 1, 2]) for (const c of AF.CUSTOMERS) { const d = AF.decide(c, 30000, code); if (d.decision === 'Decline') { assert.ok(d.reasons.length > 0, c.id); d.reasons.forEach(r => assert.ok(AF.REASONS[r], r)); } } });
+test('a stricter policy never raises the approval rate', () => { const base = AF.portfolio(AF.DEFAULT_POLICY, 30000, 0).approvalRate; const strict = AF.portfolio({ ...AF.DEFAULT_POLICY, maxFoir: 35, minScore: 60 }, 30000, 0).approvalRate; const loose = AF.portfolio({ ...AF.DEFAULT_POLICY, maxFoir: 60, minScore: 35 }, 30000, 0).approvalRate; assert.ok(strict <= base && base <= loose, [strict, base, loose].join()); });
+test('offers are ranked and never exceed the customer capacity', () => { let n = 0; for (const c of AF.CUSTOMERS.slice(0, 200)) { const r = AF.buildOffers(c, 35000, 'Electronics', [true, true, true]); const cap = Math.max(0, c.income * AF.DEFAULT_POLICY.maxFoir / 100 - c.obligations); for (let k = 0; k < r.list.length; k++) { n++; assert.ok(r.list[k].emi <= cap + 1, c.id); if (k) assert.ok(r.list[k - 1].score >= r.list[k].score); } } assert.ok(n > 100); });
+test('rates are inputs, never hardcoded as real', () => { assert.ok(Object.values(AF.DEFAULT_POLICY.rates).every(r => typeof r === 'number')); assert.match(AF.POLICY_LABEL.maxFoir, /Maximum/); });
