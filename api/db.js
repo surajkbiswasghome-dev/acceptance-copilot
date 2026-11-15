@@ -1,5 +1,5 @@
 import { authed, hgetall, hput, redis, status } from '../server/lib.js';
-const W = { decisions: ['pm', 'head'], tickets: ['pm', 'head', 'dev', 'en'], proposals: ['pm', 'head', 'en'], notifications: ['pm', 'head', 'dev', 'en'], audit: ['pm', 'head', 'dev', 'en'], pilot: ['pm', 'head'], checks: ['pm', 'head', 'en'], settings: ['pm', 'head'] };
+const W = { decisions: ['admin', 'pm', 'head'], policy: ['admin', 'pm', 'head'], tickets: ['admin', 'pm', 'head', 'dev', 'en', 'aff'], proposals: ['admin', 'pm', 'head', 'en'], notifications: ['admin', 'pm', 'head', 'dev', 'en', 'aff'], audit: ['admin', 'pm', 'head', 'dev', 'en', 'aff'], pilot: ['admin', 'pm', 'head'], checks: ['admin', 'pm', 'head', 'en'], settings: ['admin', 'pm', 'head'] };
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (!status().server) return res.status(503).json({ error: 'server storage is not configured' });
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     if (!W[b.c].includes(role.id)) return res.status(403).json({ error: 'your role cannot change ' + b.c });
     if (b.op === 'put') { if (!b.item?.id || JSON.stringify(b.item).length > 30000) return res.status(400).json({ error: 'bad item' }); await hput(b.c, b.item); return res.status(200).json({ ok: true }); }
     if (b.op === 'del') { await redis(['HDEL', 'coll:' + b.c, String(b.id)]); return res.status(200).json({ ok: true }); }
-    if (b.op === 'clear') { if (!['pm', 'head'].includes(role.id)) return res.status(403).json({ error: 'not allowed' }); await redis(['DEL', 'coll:' + b.c]); return res.status(200).json({ ok: true }); }
+    if (b.op === 'clear') { if (!['admin', 'pm', 'head'].includes(role.id)) return res.status(403).json({ error: 'not allowed' }); await redis(['DEL', 'coll:' + b.c]); return res.status(200).json({ ok: true }); }
     return res.status(400).json({ error: 'unknown operation' });
   } catch (e) { return res.status(500).json({ error: 'storage error' }); }
 }

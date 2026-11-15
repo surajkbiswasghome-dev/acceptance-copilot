@@ -221,7 +221,8 @@ export const EXTRA_INST = [
   { id: 'x:rec', name: 'Recurring payments (e-mandate)', what: 'lets a customer authorise repeat payments within limits they set, for subscriptions and bills', fit: 'subscriptions, utilities, insurance, education fees and memberships' },
   { id: 'x:pl', name: 'Pay later at checkout', what: 'lets a customer pay after delivery or at month end, with a provider carrying the credit decision', fit: 'fashion, groceries and everyday online retail' },
 ];
-export const instName = i => (typeof i === 'number' ? INST[i] : (EXTRA_INST.find(x => x.id === i) || { name: String(i) }).name);
+const EMI_NAMES = { 'emi:upicc': 'EMI on RuPay credit card on UPI', 'emi:upicl': 'Credit line on UPI with instalments', 'emi:card': 'RuPay card EMI (card rails)' };
+export const instName = i => (typeof i === 'number' ? INST[i] : EMI_NAMES[i] || (EXTRA_INST.find(x => x.id === i) || { name: String(i) }).name);
 export const extraInst = i => EXTRA_INST.find(x => x.id === i);
 
 // ---- Credit on UPI: merchant fit check, from a payment-gateway product manager's point of view ----

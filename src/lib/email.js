@@ -1,10 +1,11 @@
 // Email templates. The same functions render the in-app preview and the email that is actually sent.
 import * as S from './stats.js';
+import * as E from './emi.js';
 const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const money = v => '₹' + Math.round(v).toLocaleString('en-IN');
 const NAVY = '#0A1020', ACC = '#2F5BEA', INK = '#14213D', MUTE = '#566075', LINE = '#E3E5EC';
 const wrap = (inner, preheader = '') => `<div style="background:#F3F4F8;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:${INK}"><span style="display:none;max-height:0;overflow:hidden">${esc(preheader)}</span><table role="presentation" width="100%" style="max-width:600px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid ${LINE}" cellspacing="0" cellpadding="0">${inner}</table></div>`;
-const head = sub => `<tr><td style="background:${NAVY};padding:18px 28px;color:#fff"><b style="font-size:16px;letter-spacing:-.01em">Acceptance Copilot</b><div style="font-size:12px;color:#9FB0D0;margin-top:2px">${esc(sub)}</div></td></tr>`;
+const head = sub => `<tr><td style="background:${NAVY};padding:18px 28px;color:#fff"><b style="font-size:16px;letter-spacing:-.01em">Manthan Acceptance Copilot</b><div style="font-size:12px;color:#9FB0D0;margin-top:2px">${esc(sub)}</div></td></tr>`;
 const btn = (href, label, primary) => `<a href="${esc(href)}" style="display:inline-block;margin:4px 6px 4px 0;padding:12px 18px;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none;${primary ? `background:${ACC};color:#fff;` : `background:#fff;color:${INK};border:1px solid ${LINE};`}">${esc(label)}</a>`;
 const bar = (label, value, max, color) => `<tr><td style="padding:3px 0;font-size:12px;color:${MUTE};width:46%">${esc(label)}</td><td style="padding:3px 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="background:${color};height:12px;border-radius:6px;width:${Math.max(4, Math.round((100 * value) / max))}%"></td><td style="font-size:12px;font-weight:700;padding-left:8px;white-space:nowrap">${value}%</td><td style="width:${Math.max(0, 100 - Math.round((100 * value) / max))}%"></td></tr></table></td></tr>`;
 const tile = (big, small) => `<td style="width:33%;vertical-align:top;padding:4px"><div style="background:#F3F5FC;border:1px solid ${LINE};border-radius:12px;padding:14px 12px"><div style="font-size:24px;font-weight:700;letter-spacing:-.02em;color:${ACC}">${esc(big)}</div><div style="font-size:12px;color:${MUTE};margin-top:4px;line-height:1.4">${esc(small)}</div></div></td>`;
@@ -20,6 +21,7 @@ const seg = (pct, color, label) => `<td style="width:${Math.max(pct, 0.8)}%;back
 const stat = (big, small, note) => `<td style="width:33%;vertical-align:top;padding:0 8px 0 0"><div style="font-size:26px;font-weight:700;letter-spacing:-.03em;color:${INK}">${esc(big)}</div><div style="font-size:12px;line-height:1.45;color:${MUTE};margin-top:3px">${esc(small)}</div>${note ? `<div style="font-size:10.5px;color:#8A93A6;margin-top:3px">${esc(note)}</div>` : ''}</td>`;
 
 export function proposalEmail(p, urls) {
+  if (E.isEmi(p.instruments[0])) return emiProposal(p, urls);
   const m = S.MERCH[p.merchantId]; const inst = p.instruments[0]; const name = S.instName(inst); const credit = inst === 5 || inst === 6; const ex = S.extraInst(inst); const b = typeof inst === 'number' ? S.peerBenchmark(p.merchantId, inst) : null; const pot = credit ? S.merchantPotential(p.merchantId) : null;
   if (!credit) return genericProposal(p, m, name, ex, b, urls);
   const fit = S.creditFit(p.merchantId, inst); const MK = { ok: ['Meets', '#1B7F4B'], warn: ['Partly', '#9A6700'], bad: ['Not yet', '#B42318'] };
@@ -90,5 +92,44 @@ export function ticketEmail(t, link) {
 export function briefEmail(b) {
   const sec = b.sections.map(s => `<tr><td style="padding:10px 28px 0"><div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${MUTE};margin-bottom:6px">${esc(s.title)}</div>${s.lines.map(l => `<div style="font-size:14px;line-height:1.6;padding:3px 0">• ${esc(l)}</div>`).join('')}</td></tr>`).join('');
   const html = wrap(`${head('Morning brief')}<tr><td style="padding:24px 28px 4px"><div style="font-size:20px;font-weight:700;letter-spacing:-.02em">${esc(b.headline)}</div></td></tr>${sec}<tr><td style="padding:16px 28px 24px;font-size:11.5px;color:${MUTE}">Demo data. Numbers are computed from the synthetic dataset.</td></tr>`, b.headline);
-  return { subject: 'Acceptance Copilot morning brief', html, text: b.text };
+  return { subject: 'Manthan Acceptance Copilot morning brief', html, text: b.text };
+}
+
+function emiProposal(p, urls) {
+  const m = S.MERCH[p.merchantId]; const prod = E.emiProduct(p.instruments[0]); const f = E.emiFit(p.merchantId, prod.code); const pot = f.pot; const name = prod.name; const u = urls || { interested: '#interested', more: '#more', later: '#later' };
+  const MK = { ok: ['Meets', '#1B7F4B'], warn: ['Partly', '#9A6700'], bad: ['Not yet', '#B42318'], check: ['To confirm', '#566075'] };
+  const fitTable = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:12.5px;border-collapse:collapse">${f.rows.slice(0, 11).map(r => `<tr><td style="padding:6px 0;border-bottom:1px solid ${LINE};color:${INK}">${esc(r.label)}</td><td style="padding:6px 8px;border-bottom:1px solid ${LINE};color:${MUTE}">${esc(r.value)}</td><td style="padding:6px 0;border-bottom:1px solid ${LINE};text-align:right;font-weight:700;color:${MK[r.status][1]}">${MK[r.status][0]}</td></tr>`).join('')}</table><div style="font-size:12px;color:${MUTE};margin-top:8px">Overall: ${esc(f.verdict)} (${f.score} of ${f.outOf} scored checks).</div>`;
+  const ex = E.noCostExample(pot.addressableAvg); const range = `${pot.lowPer1000} to ${pot.highPer1000}`;
+  const subject = `${m.name}: letting customers split larger purchases into instalments (${prod.short}) [${p.id}]`;
+  const html = wrap(`${head('Merchant growth proposal · ' + p.id)}
+  <tr><td style="padding:30px 28px 6px"><div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${ACC}">Prepared for ${esc(m.name)} · ${esc(m.category)}</div>
+  <div style="font-size:24px;font-weight:700;letter-spacing:-.025em;line-height:1.2;margin-top:8px">Larger purchases are where customers hesitate. Showing instalments inside the UPI checkout can help them say yes.</div>
+  <p style="font-size:14px;line-height:1.6;color:${MUTE};margin:12px 0 0">Today ${esc(name)} ${esc(prod.what)}. We looked at your recent payments and estimated what it could add. It is a range with a stated assumption, not a promise.</p></td></tr>
+
+  <tr><td style="padding:18px 28px 6px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${NAVY};border-radius:14px"><tr><td style="padding:22px 24px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0">Potential EMI checkouts</div>
+    <div style="font-size:38px;font-weight:700;letter-spacing:-.03em;color:#fff;margin-top:6px">${range} <span style="font-size:16px;font-weight:600;color:#9FB0D0">more per 1,000 payment attempts</span></div>
+    <div style="font-size:13px;line-height:1.55;color:#C9D4EC;margin-top:8px">Worth roughly ${money(pot.lowValuePer1000)} to ${money(pot.highValuePer1000)} in sales per 1,000 attempts, at your typical eligible ticket of ${money(pot.addressableAvg)}.</div>
+  </td></tr></table></td></tr>
+
+  <tr><td style="padding:22px 28px 4px">${sec('Your payments today')}
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${stat(String(pot.addressable), 'UPI payments of ₹2,500 and above in 30 days (' + pot.addressableShare + '% of your payments)', 'Where EMI can be shown')}${stat(money(pot.avgTicket), 'your average ticket', '')}${stat(String(pot.gap), 'payments of ₹2,500 and above declined for insufficient balance', 'Customers who wanted to buy')}</tr></table></td></tr>
+
+  <tr><td style="padding:22px 28px 4px">${sec('What your customer would see')}
+    <div style="font-size:13px;line-height:1.6;color:${INK}">Inside the UPI checkout, before paying, the customer sees the plans they are eligible for. At your typical eligible ticket, a no-cost plan, where the interest is funded by the merchant or the brand, would look like this: ${ex.map(x => `<b>${x.tenure} months at ${money(x.monthly)} a month</b>`).join(', ')}. Interest-bearing plans are set by the lender. Eligibility, plans and charges depend on the issuer and the UPI app.</div></td></tr>
+
+  <tr><td style="padding:22px 28px 4px">${sec('What is happening in the market')}
+    <div style="font-size:13px;line-height:1.6;color:${INK}">${esc(prod.status)}</div>
+    <div style="font-size:12px;line-height:1.6;color:${MUTE};margin-top:6px">Reported by PayU (blog, 28 October 2026) and by Dhanam (23 September 2025). We have not assumed any fee, interest rate or funding split.</div></td></tr>
+
+  <tr><td style="padding:18px 28px 4px">${sec('Why this fits ' + m.name)}${fitTable}</td></tr>
+
+  <tr><td style="padding:18px 28px 4px">${sec('How the range is worked out')}
+    <div style="font-size:12.5px;line-height:1.65;color:${MUTE};border-left:3px solid ${LINE};padding-left:12px">${pot.addressableShare}% of your payments are UPI payments of ₹2,500 and above. We assume ${Math.round(pot.assumption.low * 100)}% to ${Math.round(pot.assumption.high * 100)}% of those would choose EMI once it is offered. A short trial, with a comparison group, would replace this assumption with your own measured result.</div></td></tr>
+
+  <tr><td style="padding:22px 28px 6px">${sec('Next step')}<div style="font-size:14px;line-height:1.6;margin-bottom:12px">One click tells us you would like to explore it. Nothing is switched on. We then confirm the steps with your acquirer and the issuers, agree how the offers are funded, and plan a small trial, with results reviewed together before anything wider.</div>${btn(u.interested, 'Yes, I would like to explore this', true)}${btn(u.more, 'Tell me more', false)}${btn(u.later, 'Not now', false)}</td></tr>
+
+  <tr><td style="padding:18px 28px 26px"><div style="font-size:11px;color:#8A93A6;line-height:1.6;border-top:1px solid ${LINE};padding-top:12px">No commercial terms are included. The merchant and payment figures belong to a fictional demo merchant built on synthetic data, and the range is an illustration with the stated assumption, not a forecast.</div></td></tr>`, `${range} more EMI checkouts per 1,000 on ${m.name}`);
+  const text = `${m.name}: letting customers split larger purchases into instalments (${name}).\n\nIllustrative potential: ${range} more EMI checkouts per 1,000 payment attempts (about ${money(pot.lowValuePer1000)} to ${money(pot.highValuePer1000)} in sales), assuming ${Math.round(pot.assumption.low * 100)}-${Math.round(pot.assumption.high * 100)}% of the ${pot.addressableShare}% of payments that are UPI payments of Rs 2,500 and above choose EMI. Not a forecast. No fee, rate or funding split is assumed.\n\nInterested: ${u.interested}\nTell me more: ${u.more}\nNot now: ${u.later}`;
+  return { subject, html, text };
 }

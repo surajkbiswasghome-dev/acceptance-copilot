@@ -1,6 +1,6 @@
 // Welcome messages in four languages. Only the welcome and its voice change language; the rest of the platform stays in English.
 export const LANGS = [{ id: 'en', label: 'English', tag: 'en-IN' }, { id: 'hi', label: 'हिन्दी', tag: 'hi-IN' }, { id: 'bn', label: 'বাংলা', tag: 'bn-IN' }, { id: 'mr', label: 'मराठी', tag: 'mr-IN' }];
-export const DEFAULT_LANG = { pm: 'en', head: 'hi', en: 'bn', dev: 'mr' };
+export const DEFAULT_LANG = { pm: 'en', head: 'hi', en: 'bn', dev: 'mr', aff: 'en', admin: 'en' };
 const PACK = {
   en: { hello: (n, g) => `${g} ${n}, welcome to Manthan Portal.`, g: ['Good morning', 'Good afternoon', 'Good evening'], rate: x => `Success is ${x}% over the last 30 days.`, finds: n => `${n} finding${n === 1 ? '' : 's'} to decide`, route: n => `${n} routing request${n === 1 ? '' : 's'} awaiting approval`, reply: n => `${n} merchant repl${n === 1 ? 'y' : 'ies'} to follow up`, join: b => `You have ${b.join(', ')}.`, none: 'Nothing is waiting on you right now.', top: t => `Biggest leak: ${t}.`, end: 'How may I help you?' },
   hi: { hello: (n, g) => `${g} ${n}, मंथन पोर्टल में आपका स्वागत है।`, g: ['सुप्रभात', 'शुभ दोपहर', 'शुभ संध्या'], rate: x => `पिछले तीस दिनों में सफलता दर ${x}% है।`, finds: n => `${n} निष्कर्षों पर निर्णय बाकी है`, route: n => `${n} राउटिंग अनुरोध मंज़ूरी की प्रतीक्षा में हैं`, reply: n => `${n} मर्चेंट के जवाब पर फ़ॉलो-अप बाकी है`, join: b => `आपके पास ${b.join(', ')}।`, none: 'अभी आपके लिए कुछ भी लंबित नहीं है।', top: t => `सबसे बड़ा लीक: ${t}।`, end: 'मैं आपकी कैसे मदद कर सकती हूँ?' },

@@ -14,7 +14,7 @@ export default function Recommend({ role }) {
   const insts = cov.map(x => S.INST.indexOf(x.instrument)).filter(i => i >= 0);
   const bench = [5, 6].map(i => ({ i, b: S.peerBenchmark(mi, i) }));
   const existing = props.find(x => x.merchantId === mi && x.status !== 'not_now');
-  const canEdit = ['pm', 'head', 'en'].includes(role.id);
+  const canEdit = ['pm', 'head', 'en', 'admin'].includes(role.id);
   const create = async () => { const now = new Date().toISOString(); const id = uid('PRP'); await put('proposals', { id, merchantId: mi, instruments: insts, status: 'draft', created: now, ts: now, events: [{ ts: now, who: role.name, text: 'Draft created from recommendation' }] }); await audit(role.name, 'Created proposal', m.name, id); setMade(id); };
   return (
     <>

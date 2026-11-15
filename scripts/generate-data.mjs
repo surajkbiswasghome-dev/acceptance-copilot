@@ -124,7 +124,55 @@ tx.forEach(t => {
   t.push(Math.round(lat), Math.round(cost * 10) / 10);
 });
 
-const data = { meta: { synthetic: true, generated: 'seed ' + SEED, note: 'Synthetic data. No real merchants, issuers, cards or payments.', fields: ['day', 'merchant', 'acquirer', 'instrument', 'issuer', 'amount', 'status', 'latency_ms', 'cost_index'] }, acquirers: ACQUIRERS, instruments: INSTRUMENTS, issuers: ISSUERS, declines: DECLINES, merchants, tx };
+// ---- Fifth pass (own stream R5): EMI at checkout. Enablement flags per merchant and EMI checkout events. Synthetic. Earlier streams are untouched.
+// Products: 0 EMI on RuPay credit card on UPI, 1 credit line on UPI with instalments, 2 RuPay card EMI on card rails.
+// Outcomes: 0 converted, 1 left at plan selection, 2 not eligible, 3 issuer declined the conversion, 4 technical failure.
+const R5 = rng(SEED + 24680); const g5 = () => Math.sqrt(-2 * Math.log(1 - R5())) * Math.cos(2 * Math.PI * R5());
+const HIGHV = ['Electronics', 'Travel', 'Education', 'Healthcare', 'Home improvement'];
+merchants.forEach(m => {
+  if (m.showcase) { m.emi = [0, 0, 1]; return; }
+  const hv = HIGHV.includes(m.category);
+  m.emi = [hv && R5() < 0.4 ? 1 : 0, 0, R5() < (hv ? 0.8 : m.category === 'Fashion' ? 0.4 : 0.05) ? 1 : 0];
+});
+{ const hvIdx = merchants.map((m, i) => i).filter(i => !merchants[i].showcase && HIGHV.includes(merchants[i].category));
+  let n0 = merchants.filter(m => m.emi[0]).length; for (const i of hvIdx) { if (n0 >= 8) break; if (!merchants[i].emi[0]) { merchants[i].emi[0] = 1; n0++; } }
+  const withUpi = merchants.map((m, i) => i).filter(i => merchants[i].emi[0]); withUpi.slice(1, 3).forEach(i => { merchants[i].emi[1] = 1; }); }
+const EMI_BASE = [95, 70, 120], EMI_TENURES = [3, 6, 9, 12, 18]; const emiEvents = [];
+merchants.forEach((m, mi) => {
+  const hv = HIGHV.includes(m.category); const acqIdx = ACQUIRERS.indexOf(m.acquirer);
+  [0, 1, 2].forEach(p => {
+    if (!m.emi[p]) return; const n = Math.round(EMI_BASE[p] * (hv ? 1 : 0.5) * (0.7 + 0.6 * R5()));
+    for (let k = 0; k < n; k++) {
+      const day = Math.floor(R5() * 30); const issuerIdx = Math.floor(R5() * ISSUERS.length);
+      const amount = Math.max(2500, Math.round(Math.max(m.median, 6000) * Math.exp(g5() * 0.5) / 10) * 10);
+      const tw = amount >= 30000 ? [4, 14, 20, 30, 18] : amount >= 10000 ? [10, 28, 24, 22, 8] : [34, 34, 18, 10, 4];
+      let x = R5() * tw.reduce((a, b) => a + b, 0), ti = 0; for (; ti < tw.length - 1; ti++) { x -= tw[ti]; if (x <= 0) break; } const tenure = EMI_TENURES[ti];
+      let dropped = [0.24, 0.22, 0.18][p], notElig = [0.07, 0.18, 0.05][p], decl = [0.07, 0.06, 0.05][p], tech = [0.03, 0.05, 0.02][p];
+      if (p < 2 && issuerIdx === 4) decl = 0.34;
+      if (tenure >= 12 && amount < 10000) dropped += 0.30;
+      if (p < 2 && acqIdx === 2) tech = 0.17;
+      const u = R5(); let outcome = 0;
+      if (u < tech) outcome = 4; else if (u < tech + dropped) outcome = 1; else if (u < tech + dropped + notElig) outcome = 2; else if (u < tech + dropped + notElig + decl) outcome = 3;
+      emiEvents.push([day, mi, p, issuerIdx, amount, tenure, outcome]);
+    }
+  });
+});
+// ---- Sixth pass (own stream R6): synthetic customers for the affordability engine. No real people: every row is invented.
+const R6 = rng(SEED + 97531); const g6 = () => Math.sqrt(-2 * Math.log(1 - R6())) * Math.cos(2 * Math.PI * R6());
+const COHORTS = ['Salaried, metro', 'Salaried, tier 2 and 3', 'Self-employed', 'Gig and micro-business', 'Early career'];
+const CW = [26, 24, 18, 14, 18], C_INC = [90000, 48000, 75000, 30000, 42000], C_SPR = [0.4, 0.35, 0.55, 0.45, 0.3], C_OBL = [0.22, 0.25, 0.28, 0.2, 0.15], C_CC = [0.8, 0.6, 0.55, 0.3, 0.5], C_LN = [0.3, 0.25, 0.3, 0.35, 0.4], C_OT = [95, 92, 88, 80, 90], C_MD = [0.6, 0.45, 0.4, 0.35, 0.5];
+const customers = [];
+for (let i = 0; i < 600; i++) {
+  let x = R6() * CW.reduce((a, b) => a + b, 0), c = 0; for (; c < CW.length - 1; c++) { x -= CW[c]; if (x <= 0) break; }
+  const income = Math.max(12000, Math.round(C_INC[c] * Math.exp(g6() * C_SPR[c]) / 500) * 500);
+  const obl = Math.round(Math.min(0.65, C_OBL[c] * (0.3 + R6() * 1.4)) * income / 100) * 100;
+  const hasCC = R6() < C_CC[c] ? 1 : 0, hasLine = R6() < C_LN[c] ? 1 : 0;
+  const ccLimit = hasCC ? Math.max(15000, Math.round(income * (2 + R6() * 4) / 5000) * 5000) : 0, ccUtil = hasCC ? Math.round(Math.pow(R6(), 1.5) * 85) : 0;
+  const lineLimit = hasLine ? Math.max(10000, Math.round(income * (0.5 + R6() * 1.5) / 5000) * 5000) : 0, lineUtil = hasLine ? Math.round(Math.pow(R6(), 1.5) * 80) : 0;
+  const onTime = Math.max(55, Math.min(100, Math.round(C_OT[c] - Math.abs(g6()) * 8 + (R6() < 0.1 ? -12 : 0))));
+  customers.push([c, c === 0 ? 0 : c === 1 ? 2 : c === 4 ? 1 : (R6() < 0.5 ? 1 : 2), income, obl, ccLimit, ccUtil, lineLimit, lineUtil, onTime, R6() < C_MD[c] ? 1 : 0]);
+}
+const data = { meta: { synthetic: true, generated: 'seed ' + SEED, note: 'Synthetic data. No real merchants, issuers, cards or payments.', fields: ['day', 'merchant', 'acquirer', 'instrument', 'issuer', 'amount', 'status', 'latency_ms', 'cost_index'] }, acquirers: ACQUIRERS, instruments: INSTRUMENTS, issuers: ISSUERS, declines: DECLINES, merchants, tx, emi: { products: ['EMI on RuPay credit card on UPI', 'Credit line on UPI with instalments', 'RuPay card EMI (card rails)'], outcomes: ['converted', 'left at plan selection', 'not eligible', 'issuer declined', 'technical failure'], fields: ['day', 'merchant', 'product', 'issuer', 'amount', 'tenure', 'outcome'], events: emiEvents }, customers: { cohorts: COHORTS, fields: ['cohort', 'city_tier', 'monthly_income', 'monthly_obligations', 'card_limit', 'card_utilisation_pct', 'line_limit', 'line_utilisation_pct', 'on_time_pct', 'autopay_mandate'], rows: customers } };
 fs.writeFileSync('src/data/dataset.json', JSON.stringify(data));
 fs.writeFileSync('src/data/dataset.js', '// Generated by scripts/generate-data.mjs. Synthetic data only.\nexport default ' + JSON.stringify(data) + ';\n');
-console.log('transactions', tx.length, 'merchants', merchants.length);
+console.log('transactions', tx.length, 'merchants', merchants.length, 'emi events', emiEvents.length, 'customers', customers.length, 'emi merchants upi/line/card', merchants.filter(m => m.emi[0]).length, merchants.filter(m => m.emi[1]).length, merchants.filter(m => m.emi[2]).length);

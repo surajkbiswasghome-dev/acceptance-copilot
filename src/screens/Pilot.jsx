@@ -9,7 +9,7 @@ const num = v => (v === '' || v == null ? null : Number(v));
 export default function Pilot({ role }) {
   const doc = useColl('pilot').find(x => x.id === 'main') || DEF; const props = useColl('proposals'); const checks = useColl('checks');
   const [add, setAdd] = useState(S.MERCH.findIndex(m => m.category === 'Electronics'));
-  const edit = ['pm', 'head'].includes(role.id); const save = async d => put('pilot', { ...DEF, ...doc, ...d });
+  const edit = ['pm', 'head', 'admin'].includes(role.id); const save = async d => put('pilot', { ...DEF, ...doc, ...d });
   const rows = useMemo(() => S.TX.filter(t => doc.cohort.includes(t.m)), [doc.cohort.join()]);
   const base = rows.length ? { share: Math.round(1000 * rows.filter(t => t.inst === 5).length / rows.length) / 10, success: S.rate(rows), n: rows.length } : null;
   const wk = Array.from({ length: 8 }, (_, i) => ({ w: i + 1, ...(doc.weeks[i + 1] || {}) }));

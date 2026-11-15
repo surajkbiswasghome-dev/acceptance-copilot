@@ -11,7 +11,7 @@ export default function Enable({ role }) {
   const [sel, setSel] = useState(fromHash());
   useEffect(() => { const f = () => setSel(fromHash()); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
   const p = queue.find(x => x.id === sel) || queue[0]; const done = (p && checks.find(c => c.id === p.id)?.done) || [];
-  const canEdit = ['pm', 'head', 'en'].includes(role.id);
+  const canEdit = ['pm', 'head', 'en', 'admin'].includes(role.id);
   const toggle = async i => { const next = done.includes(i) ? done.filter(x => x !== i) : [...done, i]; await put('checks', { id: p.id, done: next }); await audit(role.name, (done.includes(i) ? 'Unchecked' : 'Checked') + ' step', S.MERCH[p.merchantId].name, STEPS[i][0]); };
   const live = async () => { const now = new Date().toISOString(); await put('proposals', { ...p, status: 'live', events: [...p.events, { ts: now, who: role.name, text: 'Marked live after enablement' }] }); await audit(role.name, 'Marked live', S.MERCH[p.merchantId].name, p.id); };
   return (
