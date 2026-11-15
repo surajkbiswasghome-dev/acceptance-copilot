@@ -2,20 +2,22 @@ import React, { useMemo, useState } from 'react';
 import * as A from '../lib/afford.js';
 import { useActivePolicy } from '../lib/policy.js';
 import { Head } from '../ui.jsx';
+import { useExtended } from '../lib/scope.js';
+import { binInfo, ISSUER_CAPS } from '../lib/ext.js';
 import { ProductSeg, Ticket, DecisionPill, Reasons, ScoreBars, Synthetic, Illustrative, money } from '../AffParts.jsx';
 
 const start = () => { try { const id = sessionStorage.getItem('aff_customer'); if (id) { sessionStorage.removeItem('aff_customer'); return id; } } catch {} return A.personas()[0].id; };
 export default function AffDecide() {
-  const policy = useActivePolicy(); const [id, setId] = useState(start); const [code, setCode] = useState(0); const [ticket, setTicket] = useState(35000); const [mandate, setMandate] = useState(null); const [ed, setEd] = useState({});
+  const ext = useExtended(); const policy = useActivePolicy(); const [id, setId] = useState(start); const [code, setCode] = useState(0); const [ticket, setTicket] = useState(35000); const [mandate, setMandate] = useState(null); const [ed, setEd] = useState({});
   const base = A.CUSTOMERS.find(c => c.id === id) || A.CUSTOMERS[0]; const c = { ...base, ...ed }; if (ed.cardUtil != null) c.hasCard = base.hasCard; const m = mandate ?? c.mandate;
-  const d = useMemo(() => A.decide(c, ticket, code, policy, { mandate: m }), [id, code, ticket, m, ed, policy]);
+  const d = useMemo(() => A.decide(c, ticket, ext || code < 3 ? code : 0, policy, { mandate: m, binAware: ext }), [id, code, ticket, m, ed, policy, ext]);
   const pick = v => { setId(v); setEd({}); setMandate(null); };
   const set = (k, v) => setEd({ ...ed, [k]: v });
   return (<div className="col" style={{ gap: 18 }}>
     <Head title="Eligibility and limit decision" sub="One customer, one ticket, one product. The decision, the score and the reason codes are always shown." right={<Synthetic />} />
     <section className="card"><div className="grid2e" style={{ alignItems: 'start' }}>
       <div className="col" style={{ gap: 12 }}><label className="col" style={{ gap: 4 }}><span className="sm mute">Customer</span><select value={id} onChange={e => pick(e.target.value)}>{A.personas().map(p => <option key={p.id} value={p.id}>{p.id} · {p.cohortName} (example)</option>)}{A.CUSTOMERS.slice(0, 120).filter(x => !A.personas().some(p => p.id === x.id)).map(x => <option key={x.id} value={x.id}>{x.id} · {x.cohortName}</option>)}</select></label>
-        <ProductSeg value={code} onChange={setCode} /><Ticket value={ticket} onChange={setTicket} />
+        <ProductSeg value={ext ? code : Math.min(code, 2)} onChange={setCode} ext={ext} /><Ticket value={ticket} onChange={setTicket} />
         <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={m} onChange={e => setMandate(e.target.checked)} style={{ accentColor: 'var(--acc)' }} /><span className="sm">UPI AutoPay mandate set up for repayment</span></label>
         <details><summary className="sm" style={{ cursor: 'pointer' }}>Change this customer (what-if)</summary><div className="col" style={{ gap: 10, marginTop: 10 }}>
           <label className="slider"><span className="sm">Monthly income: <b>{money(c.income)}</b></span><input type="range" min="12000" max="250000" step="1000" value={c.income} onChange={e => set('income', +e.target.value)} /></label>
@@ -28,6 +30,7 @@ export default function AffDecide() {
     <div className="grid2e"><section className="card"><span className="eyebrow">Scorecard</span><ScoreBars d={d} /><span className="mute sm">Cut-off: approve from {policy.minScore + policy.stepUpBand}, step-up from {policy.minScore}, decline below.</span></section>
       <section className="card"><span className="eyebrow">Instalment options this customer can afford</span>{d.tenures.length ? <table><thead><tr><th>Tenure</th><th>Monthly EMI</th><th>Share of capacity</th><th>Total repaid</th></tr></thead><tbody>{d.tenures.map(t => <tr key={t.tenure}><td><b>{t.tenure} months</b></td><td className="num">{money(t.emi)}</td><td className="num">{t.share}%</td><td className="num">{money(t.total)}</td></tr>)}</tbody></table> : <span className="sm mute">None. No instalment option is shown that the customer cannot carry.</span>}
         <div className="insight col" style={{ gap: 4 }}><b>Repayment mode</b><span className="sm">{d.repayment}. Collecting by AutoPay lowers the chance of a missed instalment, so it counts towards the score. Mandate set-up and retries are handled by the lender and are not built here.</span></div></section></div>
+    <section className="card"><span className="eyebrow">Issuer enablement{ext ? ' and BIN' : ''}</span>{(() => { const ic = ISSUER_CAPS[c.issuer]; const bi = binInfo(code === 3 ? c.xBin : code === 4 ? c.debitBin : c.bin); return (<div className="grid3t"><div className="kt"><small>Issuer (synthetic)</small><b>{ic.name}</b><small>{policy.issuerAware === false ? 'Issuer check is off in policy' : 'Issuer must switch the product on'}</small></div><div className="kt"><small>RuPay products enabled</small><b>{[ic.upiEmi && 'EMI on UPI', ic.line && 'Credit line', ic.card && 'Card EMI'].filter(Boolean).join(', ') || 'None'}</b><small>Illustrative</small></div>{ext && bi && <div className="kt"><small>BIN {bi.bin} (fictional)</small><b>{bi.network} {bi.type.toLowerCase()}</b><small>BIN-level EMI: {code === 0 ? (bi.upiEmi ? 'on UPI yes' : 'on UPI no') : code === 1 ? (bi.line ? 'line yes' : 'line no') : (bi.cardEmi ? 'card yes' : 'card no')}</small></div>}</div>); })()}</section>
     <Illustrative />
   </div>);
 }

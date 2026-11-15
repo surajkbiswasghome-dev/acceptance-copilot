@@ -1,6 +1,10 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useKey } from './lib/store.js';
-import { ROLES, roleById } from './lib/roles.js';
+import { ROLES, roleById, ALL_VIEWS, AFF_VIEWS, EXT_VIEWS } from './lib/roles.js';
+import ScopeBar from './ScopeBar.jsx';
+import { useScope } from './lib/scope.js';
+import AffBin from './screens/AffBin.jsx';
+import AffLenders from './screens/AffLenders.jsx';
 import { audit, conn, resetDemo } from './lib/db.js';
 import { Logo, ResetButton, Toasts } from './ui.jsx';
 const Insights = lazy(() => import('./screens/Insights.jsx'));
@@ -25,8 +29,8 @@ import AffPolicy from './screens/AffPolicy.jsx';
 import { Welcome, Chat } from './Assistant.jsx';
 import { DEFAULT_LANG } from './lib/lang.js';
 
-const LABEL = { insights: 'Insights', diagnose: 'Diagnose', explain: 'Explain', recommend: 'Recommend', proposals: 'Proposals', enable: 'Enablement', tickets: 'Tickets', pilot: 'Pilot', brief: 'Brief', agents: 'Agents', emi: 'EMI', aoverview: 'Overview', acustomers: 'Customers', adecide: 'Decision', aoffers: 'Offer engine', asim: 'Simulator', apolicy: 'Policy' };
-const SCREENS = { insights: Insights, diagnose: Diagnose, explain: Explain, recommend: Recommend, proposals: Proposals, enable: Enable, tickets: Tickets, pilot: Pilot, brief: Brief, agents: Agents, account: Account, emi: Emi, aoverview: AffOverview, acustomers: AffCustomers, adecide: AffDecide, aoffers: AffOffers, asim: AffSim, apolicy: AffPolicy };
+const LABEL = { insights: 'Insights', diagnose: 'Diagnose', explain: 'Explain', recommend: 'Recommend', proposals: 'Proposals', enable: 'Enablement', tickets: 'Tickets', pilot: 'Pilot', brief: 'Brief', agents: 'Agents', emi: 'EMI', aoverview: 'Overview', acustomers: 'Customers', adecide: 'Decision', aoffers: 'Offer engine', asim: 'Simulator', apolicy: 'Policy', abin: 'BINs', alend: 'Lenders' };
+const SCREENS = { insights: Insights, diagnose: Diagnose, explain: Explain, recommend: Recommend, proposals: Proposals, enable: Enable, tickets: Tickets, pilot: Pilot, brief: Brief, agents: Agents, account: Account, emi: Emi, aoverview: AffOverview, acustomers: AffCustomers, adecide: AffDecide, aoffers: AffOffers, asim: AffSim, apolicy: AffPolicy, abin: AffBin, alend: AffLenders };
 const useRoute = () => { const get = () => (location.hash.replace('#/', '') || 'insights').split('?')[0]; const [r, setR] = useState(get); useEffect(() => { const f = () => setR(get()); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []); return r; };
 
 export default function App() {
@@ -34,20 +38,24 @@ export default function App() {
   const [theme, setTheme] = useKey('ac_theme', 'dark');
   const [open, setOpen] = useState(false); const [more, setMore] = useState(false);
   const route = useRoute(); const [welcome, setWelcome] = useState(() => { try { return !sessionStorage.getItem('ac_welcomed'); } catch { return true; } }); const [confirmReset, setConfirmReset] = useState(false); const [chatOpen, setChatOpen] = useState(false); const [seed, setSeed] = useState(null);
+  const scope = useScope(); const [ws, setWsS] = useKey('ac_ws', 'acc'); const setWs = v => setWsS(v === 'aff' ? 'aff' : 'acc');
   useEffect(() => { document.documentElement.dataset.theme = theme; const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = theme === 'dark' ? '#0A1020' : '#F3F2ED'; }, [theme]);
   useEffect(() => { setOpen(false); setMore(false); window.scrollTo(0, 0); }, [route]);
   useEffect(() => { const f = () => { conn.setLocal(); setUser(null); location.hash = ''; }; addEventListener('ac-unauth', f); return () => removeEventListener('ac-unauth', f); }, []);
-  if (!user || !ROLES.some(r => r.id === user)) return <Login theme={theme} setTheme={setTheme} onLogin={(r, g) => { try { g === false ? sessionStorage.setItem('ac_welcomed', '1') : sessionStorage.removeItem('ac_welcomed'); } catch {} setWelcome(g !== false); setUser(r.id); audit(r.name, 'Signed in', 'Workspace'); location.hash = r.id === 'aff' ? '#/aoverview' : '#/insights'; }} />;
+  if (!user || !ROLES.some(r => r.id === user)) return <Login theme={theme} setTheme={setTheme} onLogin={(r, g) => { try { g === false ? sessionStorage.setItem('ac_welcomed', '1') : sessionStorage.removeItem('ac_welcomed'); } catch {} setWelcome(g !== false); setUser(r.id); audit(r.name, 'Signed in', 'Workspace'); location.hash = r.id === 'aff' ? '#/aoverview' : '#/insights'; if (r.id === 'admin') setWsS('acc'); }} />;
   const role = roleById(user);
   const signOut = () => { audit(role.name, 'Signed out', 'Workspace'); conn.setLocal(); setUser(null); location.hash = ''; };
-  const allowed = route === 'account' || role.views.includes(route);
-  const Screen = allowed ? SCREENS[route] || Diagnose : (SCREENS[role.views[0]] || Diagnose);
-  const bottom = role.views.length > 5 ? role.views.slice(0, 4) : role.views; const rest = role.views.length > 5 ? role.views.slice(4) : [];
+  const wsNow = role.id === 'admin' ? ws : role.id === 'aff' ? 'aff' : 'acc';
+  const navViews = role.id === 'admin' ? (wsNow === 'aff' ? [...AFF_VIEWS.slice(0, 6), ...(scope === 'all' ? EXT_VIEWS : []), ...AFF_VIEWS.slice(6)] : ALL_VIEWS) : role.id === 'aff' ? [...AFF_VIEWS.slice(0, 6), ...(scope === 'all' ? EXT_VIEWS : []), ...AFF_VIEWS.slice(6)] : role.views;
+  const allowed = route === 'account' || navViews.includes(route) || (role.id === 'admin' && role.views.includes(route) && !EXT_VIEWS.includes(route));
+  const Screen = allowed ? SCREENS[route] || Diagnose : (SCREENS[navViews[0]] || Diagnose);
+  const bottom = navViews.length > 5 ? navViews.slice(0, 4) : navViews; const rest = navViews.length > 5 ? navViews.slice(4) : [];
+  const showBar = role.id === 'admin' || role.id === 'aff' || route === 'emi';
   return (
     <div className="shell">
       <header className="top">
-        <a href={'#/' + role.views[0]} className="brand"><Logo /><span className="brandname">{role.id === 'aff' ? 'Manthan Affordability Engine' : 'Manthan Acceptance Copilot'}</span></a>
-        <nav className="nav" aria-label="Views">{role.views.map(k => <a key={k} href={'#/' + k} className={route === k ? 'on' : ''} aria-current={route === k ? 'page' : undefined}>{LABEL[k]}</a>)}</nav>
+        <a href={'#/' + navViews[0]} className="brand"><Logo /><span className="brandname">{wsNow === 'aff' ? 'Manthan Affordability Engine' : 'Manthan Acceptance Copilot'}</span></a>
+        <nav className="nav" aria-label="Views">{navViews.map(k => <a key={k} href={'#/' + k} className={route === k ? 'on' : ''} aria-current={route === k ? 'page' : undefined}>{LABEL[k]}</a>)}</nav>
         <div style={{ flex: 1 }} className="spacer" />
         <div className="tools" style={{ position: 'relative' }}>
           <span className="pill hide-sm" title="All data in this prototype is synthetic">Synthetic data</span>
@@ -56,6 +64,7 @@ export default function App() {
           {open && <div className="menu" role="menu"><span className="who"><b>{role.name}</b><small>{role.email}</small></span><a href="#/account">Account, settings and audit log</a>{role.canApprove && <ResetButton bare className="menuitem" onReset={resetDemo} />}<button onClick={signOut}>Sign out</button></div>}
         </div>
       </header>
+      {showBar && <ScopeBar role={role} ws={wsNow} setWs={setWs} />}
       <main className="page fade" key={route}><Suspense fallback={<div className="mute">Loading…</div>}><Screen role={role} /></Suspense></main>
       {welcome && <Welcome lang={(() => { try { return sessionStorage.getItem('ac_welcome_lang') || localStorage.getItem('ac_lang_' + role.id) || DEFAULT_LANG[role.id] || 'en'; } catch { return 'en'; } })()} name={(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } })()} role={role} onClose={() => { try { sessionStorage.setItem('ac_welcomed', '1'); } catch {} setWelcome(false); }} onAsk={t => { try { sessionStorage.setItem('ac_welcomed', '1'); } catch {} setWelcome(false); setSeed({ text: t, n: Date.now() }); }} />}
       <Toasts />

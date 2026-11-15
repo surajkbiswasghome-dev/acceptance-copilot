@@ -1,3 +1,4 @@
+import { useExtended } from '../lib/scope.js';
 import React, { useMemo, useState } from 'react';
 import * as S from '../lib/stats.js';
 import * as E from '../lib/emi.js';
@@ -16,11 +17,12 @@ function Funnel({ f }) {
 export default function Emi({ role }) {
   const k = useMemo(() => E.emiKpis(), []); const findings = useMemo(() => E.emiFindings(), []); const tix = useColl('tickets');
   const [mi, setMi] = useState(S.SHOWCASE[0]); const [a, setA] = useState(E.EMI_ASSUMPTION); const [prod, setProd] = useState(0);
-  const canAct = ['pm', 'head', 'en'].includes(role.id); const canPropose = ['pm', 'head', 'en'].includes(role.id);
+  const canAct = ['pm', 'head', 'en', 'admin'].includes(role.id); const canPropose = ['pm', 'head', 'en', 'admin'].includes(role.id);
   const raise = async f => { const now = new Date().toISOString(); const t = { id: uid('TCK'), kind: 'EMI fix', findingId: f.id, title: f.title, summary: f.action, priority: 'Medium', assignee: f.owner === 'DevOps and acquirer' ? 'DevOps team' : f.owner, requester: role.name, requesterId: role.id, status: 'Open', recipients: [], channels: { email: false, telegram: false }, created: now, ts: now, events: [{ ts: now, who: role.name, text: 'Raised from the EMI findings' }] }; await put('tickets', t); await audit(role.name, 'Raised EMI fix ticket', f.title, t.id); toast('Ticket ' + t.id + ' raised. Find it under Tickets.'); };
   const propose = (m, inst) => { try { sessionStorage.setItem('ac_prefill', JSON.stringify({ mi: m, inst })); } catch {} location.hash = '#/proposals'; };
   const iss = useMemo(() => S.ISS.map((n, i) => { const r = E.EV.filter(e => e.p < 2 && e.iss === i); const f = E.funnel(r); return { n, shown: r.length, declined: f.declined, rate: r.length ? Math.round(1000 * f.declined / r.length) / 10 : 0 }; }).sort((x, y) => y.rate - x.rate).slice(0, 5), []);
   const ten = E.tenureMix(E.EV.filter(e => e.p < 2));
+  const ext = useExtended();
   return (<div className="col" style={{ gap: 18 }}>
     <Head title="EMI acceptance" sub="Scale EMI at checkout on UPI. EMI is the repayment structure, UPI is the rail, and the credit comes from a RuPay credit card or a credit line." />
     <Lifecycle active={['3']} />
@@ -34,6 +36,12 @@ export default function Emi({ role }) {
     <EmiShowcase onUse={m => { setMi(m); setProd(0); setTimeout(() => document.getElementById('emifit')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); }} />
     <EmiTargeting mi={mi} onPick={setMi} />
     <section className="card"><span className="eyebrow">Assumptions behind the range · edit them</span><Assumption a={a} setA={setA} /><div className="row wrap" style={{ gap: 8 }}>{E.EMI_PRODUCTS.filter(p => p.code < 2).map(p => <button key={p.id} className={'btn' + (prod === p.code ? ' pri' : '')} onClick={() => setProd(p.code)}>{p.short}</button>)}</div></section>
+    {ext && <NetworkBenchmark />}
     <EmiFitMatrix mi={mi} product={prod} assumption={a} canPropose={canPropose && !S.MERCH[mi].emi[prod]} onPropose={propose} />
   </div>);
 }
+
+const NetworkBenchmark = () => { const rows = [['RuPay credit', 1], ['Visa', 2], ['Mastercard', 3], ['RuPay debit', 0], ['UPI + RuPay credit', 5], ['UPI + credit line', 6]].map(([n, i]) => { const r = S.TX.filter(t => t.inst === i); return { n, vol: r.length, rate: S.rate(r), amt: Math.round(r.reduce((a, t) => a + t.amount, 0) / Math.max(1, r.length)) }; });
+  return (<section className="card"><div className="row between wrap"><span className="eyebrow">Network benchmark · extended scope</span><span className="pill">Synthetic data</span></div>
+    <table><thead><tr><th>Instrument</th><th>Payments (30 days)</th><th>Success rate</th><th>Average ticket</th></tr></thead><tbody>{rows.map(r => <tr key={r.n}><td><b>{r.n}</b></td><td className="num">{r.vol.toLocaleString('en-IN')}</td><td className="num">{r.rate}%</td><td className="num">₹{r.amt.toLocaleString('en-IN')}</td></tr>)}</tbody></table>
+    <span className="mute sm">A comparison lens only. These are payment success rates from the synthetic dataset, not EMI results, and they say nothing about real networks. Only RuPay credit cards can be used on UPI, so Visa and Mastercard EMI exists on card rails alone.</span></section>); };

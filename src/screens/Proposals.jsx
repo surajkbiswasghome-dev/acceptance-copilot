@@ -19,7 +19,7 @@ export default function Proposals({ role }) {
   const rows = [...all].sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
   const p = all.find(x => x.id === sel); const counts = Object.keys(PSTATUS).map(k => [k, all.filter(x => x.status === k).length]);
   const mail = useMemo(() => (p ? proposalEmail(p) : null), [p?.id, p?.instruments?.join()]);
-  const canEdit = ['pm', 'head', 'en'].includes(role.id);
+  const canEdit = ['pm', 'head', 'en', 'admin'].includes(role.id);
   const valid = ni.filter(i => typeof i === 'number' ? !S.MERCH[nm].enabled[i] : E.isEmi(i) ? !S.MERCH[nm].emi[E.emiProduct(i).code] : true); const emiSel = ni.find(i => E.isEmi(i));
   const create = async () => { if (!valid.length) return; const now = new Date().toISOString(); const id = uid('PRP'); await put('proposals', { id, merchantId: nm, instruments: valid, status: 'draft', created: now, ts: now, events: [{ ts: now, who: role.name, text: 'Draft created' }] }); await audit(role.name, 'Created proposal', S.MERCH[nm].name, id); setSel(id); history.replaceState(null, '', '#/proposals?id=' + id); };
   const ev = (text, extra = {}) => put('proposals', { ...p, ...extra, events: [...p.events, { ts: new Date().toISOString(), who: role.name, text }] });

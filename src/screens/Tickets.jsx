@@ -7,12 +7,12 @@ const fromHash = () => (location.hash.split('?id=')[1] || '').split('&')[0] || n
 const tone = s => (/Closed|Applied|policy active/.test(s) ? 'ok' : /Rejected/.test(s) ? 'bad' : /Pending|Open|awaiting/.test(s) ? 'warn' : '');
 // What each role can do next on a ticket
 function moves(t, role) {
-  const m = []; const staff = ['pm', 'head'].includes(role.id); const dev = role.id === 'dev';
+  const m = []; const staff = ['pm', 'head', 'admin'].includes(role.id); const dev = role.id === 'dev' || role.id === 'admin';
   if (t.kind === 'Policy change') {
-    if (t.status === 'Pending approval' && role.canApproveRouting) { if (t.requesterId === role.id) return [{ note: 'You raised this request. A second person has to approve it.' }]; m.push({ label: 'Approve policy change', to: 'Approved, policy active', pri: 1 }, { label: 'Reject', to: 'Rejected' }); }
+    if (t.status === 'Pending approval' && role.canApproveRouting) { if (t.requesterId === role.id && role.id !== 'admin') return [{ note: 'You raised this request. A second person has to approve it.' }]; m.push({ label: role.id === 'admin' && t.requesterId === role.id ? 'Approve (demo admin override)' : 'Approve policy change', to: 'Approved, policy active', pri: 1 }, { label: 'Reject', to: 'Rejected' }); }
     if (t.status === 'Approved, policy active' && staff) m.push({ label: 'Close', to: 'Closed' });
   } else if (t.kind === 'Routing change') {
-    if (t.status === 'Pending approval' && role.canApproveRouting) { if (t.requesterId === role.id) return [{ note: 'You raised this request. A second person has to approve it.' }]; m.push({ label: 'Approve routing change', to: 'Approved, ready to apply', pri: 1 }, { label: 'Reject', to: 'Rejected' }); }
+    if (t.status === 'Pending approval' && role.canApproveRouting) { if (t.requesterId === role.id && role.id !== 'admin') return [{ note: 'You raised this request. A second person has to approve it.' }]; m.push({ label: role.id === 'admin' && t.requesterId === role.id ? 'Approve (demo admin override)' : 'Approve routing change', to: 'Approved, ready to apply', pri: 1 }, { label: 'Reject', to: 'Rejected' }); }
     if (t.status === 'Approved, ready to apply' && (dev || role.canApproveRouting)) m.push({ label: 'Mark as applied', to: 'Applied', pri: 1 });
     if (t.status === 'Applied' && staff) m.push({ label: 'Verify and close', to: 'Closed', pri: 1 });
   } else {
