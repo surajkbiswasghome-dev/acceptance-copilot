@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ROLES } from '../lib/roles.js';
+import { LOGIN_ROLES as ROLES } from '../lib/roles.js';
 import { Logo } from '../ui.jsx';
 import { Control2, Journey2 } from '../LoginStage2.jsx';
 import { prepareVoice } from '../lib/speech.js';

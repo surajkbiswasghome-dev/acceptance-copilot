@@ -5,7 +5,7 @@ export default function ScopeBar({ role, ws, setWs }) {
   const scope = useScope();
   return (
     <div className="scopebar" role="group" aria-label="Workspace and scope">
-      {role.id === 'admin' ? <div className="seg" role="radiogroup" aria-label="Workspace">{[['acc', 'Acceptance Copilot'], ['aff', 'Affordability Engine']].map(([k, l]) => <button key={k} role="radio" aria-checked={ws === k} className={ws === k ? 'on' : ''} onClick={() => { setWs(k); location.hash = k === 'aff' ? '#/aoverview' : '#/insights'; }}>{l}</button>)}</div> : <span className="mute sm">{role.id === 'aff' ? 'Affordability Engine' : ''}</span>}
+      {role.id === 'admin' ? <div className="row wsw" style={{ gap: 10 }}><b className="sm">Workspace</b><div className="seg" role="radiogroup" aria-label="Workspace">{[['acc', 'Acceptance Copilot'], ['aff', 'Affordability Engine']].map(([k, l]) => <button key={k} role="radio" aria-checked={ws === k} className={ws === k ? 'on' : ''} onClick={() => { setWs(k); location.hash = k === 'aff' ? '#/aoverview' : '#/insights'; }}>{l}</button>)}</div></div> : <span className="mute sm">{role.id === 'aff' ? 'Affordability Engine' : ''}</span>}
       <div className="scope">
         <span className="sm mute hide-sm">Scope</span>
         <div className="seg" role="radiogroup" aria-label="Network scope">
