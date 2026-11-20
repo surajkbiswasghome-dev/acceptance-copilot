@@ -35,7 +35,7 @@ const useRoute = () => { const get = () => (location.hash.replace('#/', '') || '
 
 export default function App() {
   const [user, setUser] = useKey('ac_user', null);
-  const [theme, setTheme] = useKey('ac_theme', 'dark');
+  const [theme, setTheme] = useKey('ac_theme', 'light');
   const [open, setOpen] = useState(false); const [more, setMore] = useState(false);
   const route = useRoute(); const [welcome, setWelcome] = useState(() => { try { return !sessionStorage.getItem('ac_welcomed'); } catch { return true; } }); const [confirmReset, setConfirmReset] = useState(false); const [chatOpen, setChatOpen] = useState(false); const [seed, setSeed] = useState(null);
   const scope = useScope(); const [ws, setWsS] = useKey('ac_ws', 'acc'); const setWs = v => setWsS(v === 'aff' ? 'aff' : 'acc');
