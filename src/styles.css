@@ -156,3 +156,28 @@ table{border-collapse:collapse;width:100%;font-size:14px}th{text-align:left;font
 .scopebar .scope{display:flex;align-items:center;gap:10px;margin-left:auto}
 .scopebar .seg button{padding:5px 12px;font-size:13px}
 @media(max-width:900px){.scopebar{padding:8px 16px}}
+/* Login type 2 */
+.ctl2{display:flex;flex-direction:column;gap:12px;min-height:0}
+.tile2{background:var(--s1);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.count2{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.c2{gap:2px}.c2 b{font-size:26px;letter-spacing:-.03em;color:var(--acc);font-variant-numeric:tabular-nums}
+.fun2{display:flex;flex-direction:column;gap:7px}.fr2{display:grid;grid-template-columns:92px 1fr 38px;gap:8px;align-items:center}
+.bar2{height:9px;border-radius:99px;background:var(--s2);overflow:hidden}.bar2 i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--acc),color-mix(in srgb,var(--acc) 55%,var(--ok)));transition:width 1.6s cubic-bezier(.4,0,.2,1)}
+.trend2{width:100%;height:auto;max-height:120px}.pulse2{animation:pulse2 1.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pulse2{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.7);opacity:.45}}
+.dot2{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px}
+.j2{width:min(600px,100%)}.jrow2{display:flex;gap:22px;align-items:center;justify-content:center}
+.phone2{width:158px;height:290px;flex:none;border:3px solid var(--ink);border-radius:26px;background:var(--s1);position:relative;overflow:hidden;box-shadow:0 18px 40px color-mix(in srgb,var(--ink) 18%,transparent)}
+.notch2{width:54px;height:9px;border-radius:99px;background:var(--ink);margin:7px auto 0}
+.scrw2{position:absolute;inset:26px 0 0;animation:fadein .45s ease both}.scr2{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:12px;text-align:center}
+.qr2{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;width:84px;height:84px;padding:6px;background:#fff;border-radius:8px;border:1px solid var(--line)}.qr2 i{background:#fff}.qr2 i.on{background:#14213D}
+.cc2{width:120px;height:72px;border-radius:10px;background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 50%,#000));color:var(--onacc);display:flex;flex-direction:column;justify-content:space-between;padding:9px 10px;font-size:11px;text-align:left}
+.opt2{display:flex;justify-content:space-between;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font-size:12px;background:var(--s2)}.opt2.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,var(--s1))}
+.okc2{width:46px;height:46px;border-radius:50%;background:var(--ok);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;animation:pop2 .5s ease both}
+@keyframes pop2{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+.dots2{display:flex;gap:5px}.dots2 i{width:12px;height:12px;border-radius:50%;background:var(--s2);border:1px solid var(--line)}.dots2 i.on{background:var(--ok);border-color:var(--ok)}
+.tl2{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px;min-width:0}.tl2 li{display:flex;gap:10px;align-items:flex-start;opacity:.55;transition:opacity .4s}.tl2 li.on,.tl2 li.past{opacity:1}
+.pin2{width:24px;height:24px;border-radius:50%;flex:none;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--s1)}.tl2 li.on .pin2{border-color:var(--acc);color:var(--acc);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 16%,transparent)}.tl2 li.past .pin2{background:var(--ok);border-color:var(--ok);color:#fff}
+@media(max-width:900px){.g2{grid-template-columns:1fr}.count2 b{font-size:20px}.jrow2{flex-direction:column;gap:14px}.phone2{height:250px}.fr2{grid-template-columns:84px 1fr 38px}}
+@media(max-height:760px) and (min-width:901px){.ctl2{gap:8px}.tile2{padding:9px 12px}.trend2{max-height:84px}}
+@media (prefers-reduced-motion:reduce){.pulse2{animation:none}.bar2 i,.scrw2,.okc2{transition:none;animation:none}}

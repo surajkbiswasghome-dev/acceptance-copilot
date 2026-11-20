@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ROLES } from '../lib/roles.js';
 import { Logo } from '../ui.jsx';
 import { Flow, Facts, News, SigningIn } from '../LoginStage.jsx';
+import { Control2, Journey2 } from '../LoginStage2.jsx';
 import { prepareVoice } from '../lib/speech.js';
 import { conn, load, getAll } from '../lib/db.js';
 import { LANGS, DEFAULT_LANG } from '../lib/lang.js';
@@ -9,6 +10,7 @@ import { useKey } from '../lib/store.js';
 export default function Login({ onLogin, theme, setTheme }) {
   const [i, setI] = useState(0); const r = ROLES[i]; const [pw, setPw] = useState('demo-demo-demo'); const [nm, setNm] = useState(() => { try { return localStorage.getItem('ac_name') || 'Suraj'; } catch { return 'Suraj'; } }); const [lang, setLang] = useState({}); const L = lang[r.id] || (() => { try { return localStorage.getItem('ac_lang_' + r.id); } catch { return null; } })() || DEFAULT_LANG[r.id] || 'en'; const [greet, setGreet] = useState(() => { try { return localStorage.getItem('ac_greet') !== 'off'; } catch { return true; } }); const [steps, setSteps] = useState(null); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const [, setStatus] = useKey('ac_status', null);
+  const [ls, setLs] = useKey('ac_loginstyle', 1);
     const go = async () => {
     setBusy(true); setErr(''); const S3 = (a, b, c) => setSteps([['Signing you in', a], ['Loading your workspace', b], ...(greet ? [['Preparing your welcome voice', c]] : [])]); S3('run', 'todo', 'todo');
     try {
@@ -27,19 +29,19 @@ export default function Login({ onLogin, theme, setTheme }) {
   };
   return (
     <div className="login">
-      {steps && <SigningIn steps={steps} />}
+      {steps && (ls === 2 ? <Journey2 steps={steps} /> : <SigningIn steps={steps} />)}
       <div className="l">
         <div className="row"><Logo size={30} /><b style={{ fontSize: 17 }}>Manthan Acceptance Copilot</b></div>
         <div className="col" style={{ gap: 8 }}>
-          <h1>See where acceptance leaks.</h1>
+          <h1>{ls === 2 ? 'Every approval, in one view.' : 'See where acceptance leaks.'}</h1>
           <p className="mute" style={{ maxWidth: '54ch', fontSize: 15, margin: 0 }}>It turns acceptance data into a prioritised, approvable action plan. A person approves every action, and it is logged.</p>
         </div>
-        <Flow />
-        <News compact />
+        {ls === 2 ? <Control2 /> : <><Flow />
+        <News compact /></>}
         <div className="mute sm">Numbers are computed in code; the AI explains and recommends. Synthetic data only.</div>
       </div>
       <div className="r">
-        <div className="row between"><div className="col" style={{ gap: 2 }}><h2 style={{ fontSize: 22, letterSpacing: '-.02em' }}>Sign in</h2><span className="mute sm">Choose a demo account</span></div><button className="btn" style={{ minHeight: 36 }} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Ivory & Ink' : 'Midnight'}</button></div>
+        <div className="row between"><div className="col" style={{ gap: 2 }}><h2 style={{ fontSize: 22, letterSpacing: '-.02em' }}>Sign in</h2><span className="mute sm">Choose a demo account</span></div><span className="row" style={{ gap: 6 }}><button className="btn" style={{ minHeight: 36 }} aria-label={'Login style ' + (ls === 2 ? 2 : 1) + ', switch'} onClick={() => setLs(ls === 2 ? 1 : 2)}>Style {ls === 2 ? '2' : '1'}</button><button className="btn" style={{ minHeight: 36 }} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Ivory & Ink' : 'Midnight'}</button></span></div>
         <div className="roles" role="group" aria-label="Demo accounts">{ROLES.map((x, k) => <button key={x.id} className={'role' + (k === i ? ' on' : '')} aria-pressed={k === i} title={x.sub} onClick={() => setI(k)}><span className="av">{x.short}</span><span className="col" style={{ gap: 0, minWidth: 0 }}><b>{x.name.split(',')[0]}</b><span className="mute sm" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name.split(',')[1]}</span></span></button>)}</div>
         <div className="grid2e" style={{ gap: 10 }}>
           <label className="col" style={{ gap: 4 }}><span className="sm mute">Your name (for the welcome)</span><input type="text" value={nm} onChange={e => setNm(e.target.value)} /></label>
