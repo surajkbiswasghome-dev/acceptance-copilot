@@ -184,3 +184,5 @@ table{border-collapse:collapse;width:100%;font-size:14px}th{text-align:left;font
 /* Login layout: sign-in form on the left, live graphs on the right (desktop) */
 @media(min-width:901px){.login{grid-template-columns:minmax(440px,540px) 1fr}.login .r{order:-1;max-width:none}.login .l{border-right:0;border-left:1px solid var(--line);background:linear-gradient(200deg,color-mix(in srgb,var(--acc) 10%,var(--bg)),var(--bg))}}
 @media(min-width:901px) and (max-height:760px) and (max-width:1199px){.login .l>.mute.sm{display:none}}
+/* Right panel text is right-aligned on desktop */
+@media(min-width:901px){.login .l>.row{justify-content:flex-end}.login .l>.col{align-items:flex-end;text-align:right}.login .l>.mute.sm,.ctl2>.mute.sm{text-align:right}}
