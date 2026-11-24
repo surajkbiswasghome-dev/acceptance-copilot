@@ -10,7 +10,7 @@ export const ROLES = [
   { id: 'en', name: 'Arjun, Merchant enablement', short: 'AM', sub: 'Sends proposals, runs enablement checklists', email: 'arjun@demo.example', canApprove: false, canApproveRouting: false, views: ['insights', 'diagnose', 'recommend', 'emi', 'proposals', 'enable', 'tickets', 'agents'], modules: ['acceptance'] },
   { id: 'dev', name: 'Dev, DevOps engineer', short: 'DE', sub: 'Works the tickets assigned to DevOps', email: 'dev@demo.example', canApprove: false, canApproveRouting: false, views: ['insights', 'diagnose', 'tickets', 'agents'], modules: ['acceptance'] },
   { id: 'aff', name: 'Kavya, Affordability Lead', short: 'KA', sub: 'Affordability Engine: decisions, offers, policy', email: 'kavya@demo.example', canApprove: false, canApproveRouting: false, views: AFF_VIEWS, modules: ['affordability'], suite: 'affordability' },
-  { id: 'admin', name: 'Demo admin', short: 'AD', sub: 'Everything. Switch workspaces without signing out', email: 'admin@demo.example', canApprove: true, canApproveRouting: true, views: ADMIN_VIEWS },
+  { id: 'admin', name: 'Demo admin', short: 'AD', sub: 'Everything. Switch workspaces without signing out', email: 'admin@demo.example', canApprove: true, canApproveRouting: true, modules: ['acceptance', 'affordability'], views: ADMIN_VIEWS },
 ];
 export const roleById = id => ROLES.find(r => r.id === id) || ROLES[0];
 // Sign-in shows only these accounts: the demo admin first (default), then two focused experiences. The other roles remain as ticket teams and assignees.
